@@ -199,8 +199,12 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
                     _err(out, "SK014", where, f"sources[{i}] confluence entry needs page_id")
                 if "version" not in page:
                     _warn(out, "SK014", where, f"sources[{i}] confluence entry has no version; changes to the page cannot be detected")
+            elif "doc" in src:
+                doc = src["doc"] or {}
+                if not doc.get("url") and not doc.get("title"):
+                    _err(out, "SK014", where, f"sources[{i}] doc entry needs a url or title")
             elif "note" not in src:
-                _err(out, "SK014", where, f"sources[{i}] must have repo, confluence or note")
+                _err(out, "SK014", where, f"sources[{i}] must have repo, confluence, doc or note")
 
         # Variants owned by other teams
         for i, var in enumerate(meta.get("variants", []) or []):

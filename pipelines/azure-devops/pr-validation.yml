@@ -12,7 +12,7 @@ resources:
       ref: refs/heads/main
 
 variables:
-  - group: genie-context-dev     # DATABRICKS_HOST, ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID
+  - group: genie-context-dev     # DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET (OAuth M2M service principal)
   # advisory: eval failures are reported as warnings (pilot phase, as PayPal started);
   # blocking: a FAILING or NO EFFECT verdict fails the PR.
   - name: EVAL_GATE
@@ -63,9 +63,8 @@ steps:
     workingDirectory: $(Pipeline.Workspace)/s/genie-context
     env:
       DATABRICKS_HOST: $(DATABRICKS_HOST)
-      ARM_CLIENT_ID: $(ARM_CLIENT_ID)
-      ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
-      ARM_TENANT_ID: $(ARM_TENANT_ID)
+      DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+      DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
 
   - script: |
       skillkit eval --mode routing --runs 3 \
@@ -77,11 +76,10 @@ steps:
     workingDirectory: $(Pipeline.Workspace)/s/genie-context
     env:
       DATABRICKS_HOST: $(DATABRICKS_HOST)
-      ARM_CLIENT_ID: $(ARM_CLIENT_ID)
-      ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
-      ARM_TENANT_ID: $(ARM_TENANT_ID)
+      DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+      DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
 
-  - script: python pipelines/scripts/post_pr_comment.py $(Build.ArtifactStagingDirectory)/eval-report.md
+  - script: python pipelines/azure-devops/scripts/post_pr_comment.py $(Build.ArtifactStagingDirectory)/eval-report.md
     displayName: Post eval report on the PR
     condition: and(always(), ne(variables['CHANGED_SKILLS'], ''))
     workingDirectory: $(Pipeline.Workspace)/s/genie-context

@@ -20,7 +20,7 @@ Produces the DDL, the merge notebook and the global twin for one new Silver tabl
 4. If the source has PII columns, split them into `<source>_<table>_pii` with `_is_restricted BOOLEAN` and tag them `pii`. Consumers of the main table must not need the PII table.
 5. Create the notebook `Databricks/Silver/<source>_<table>` from [assets/silver_notebook.py](assets/silver_notebook.py). It runs `%run ../Common/silver_lib/merge_template` and calls `merge_table_silver`; do not write a MERGE by hand, because the helper handles soft deletes and technical columns.
 6. Add the global twin: a `global_silver.<table>` with `region_key STRING COMMENT 'UQ'` in `Databricks/Setup/Global/Silver/gl_silver_setup_tables`, partitioned by `region_key`, and a `v_<table>` view in `gl_silver_setup_views`. `update_global_table` overwrites by region partition, so the partitioning is required.
-7. TODO (generator): how a new table is registered in the silver workflow (`bundle_resources/jobs/silver/`).
+7. TODO (meta-skill): how a new table is registered in the silver workflow (`bundle_resources/jobs/silver/`).
 8. List the files changed for the pull request description.
 
 ## Verify

@@ -1,0 +1,88 @@
+# PR validation for the context repo. Copy to .github/workflows/ in your genie-context repo.
+#
+# Secrets: DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET (OAuth M2M service
+# principal with CAN QUERY on the eval endpoints); SOURCE_REPO_TOKEN (read access to private
+# source repos, for AGENTS.md context in evals).
+# Variable: EVAL_GATE = advisory (failures are warnings, for a pilot) or blocking.
+
+name: pr-validation
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  SOURCE_REPO: my-org/data-platform   # TODO: your source repo (add more checkout steps for more repos)
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: genie-context
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: repos/${{ env.SOURCE_REPO }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install skillkit
+        working-directory: genie-context
+        run: pip install -e ".[dev]"
+
+      - name: Unit tests
+        working-directory: genie-context
+        run: pytest -q
+
+      - name: Lint skills, catalog budget, workspace instructions
+        working-directory: genie-context
+        run: skillkit lint
+
+      - name: Find changed skills (and skills that use them)
+        id: changed
+        working-directory: genie-context
+        run: echo "skills=$(skillkit changed --base origin/${{ github.base_ref }})" >> "$GITHUB_OUTPUT"
+
+      - name: Evals with baseline (changed skills, 3 runs) and routing for all skills
+        if: steps.changed.outputs.skills != ''
+        working-directory: genie-context
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+          EVAL_GATE: ${{ vars.EVAL_GATE || 'advisory' }}
+        run: |
+          status=0
+          skillkit eval ${{ steps.changed.outputs.skills }} --repos-root ../repos/$(dirname "$SOURCE_REPO") \
+            --runs 3 --require-value --out eval-report.md --json eval-results.json || status=1
+          skillkit eval --mode routing --runs 3 --out routing-all.md || status=1
+          cat routing-all.md >> eval-report.md
+          if [ "$status" = 1 ]; then
+            if [ "$EVAL_GATE" = "blocking" ]; then exit 1; fi
+            echo "::warning::Evals failed (advisory mode)"
+          fi
+
+      - name: Post the eval report on the PR
+        if: always() && steps.changed.outputs.skills != ''
+        working-directory: genie-context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '[ -s eval-report.md ] && gh pr comment ${{ github.event.pull_request.number }} --body-file eval-report.md || true'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval
+          path: genie-context/eval-*.*
+          if-no-files-found: ignore

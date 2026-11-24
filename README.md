@@ -1,28 +1,29 @@
 # Skill authoring framework for Databricks Genie Code
 
-**`context-authoring`** is a meta-skill: a skill that teaches an AI agent (Claude Code, Genie Code, or any agent that supports [Agent Skills](https://agentskills.io/specification)) to turn a data platform repo and its documentation into the context Databricks Genie Code needs:
+**`context-authoring`** is a meta-skill: a skill that teaches an AI agent (Claude Code, Genie Code, or any agent that supports [Agent Skills](https://agentskills.io/specification)) to turn a repo your teams work in on Databricks (data engineering, ML, analytics, apps) and its documentation into the context Databricks Genie Code needs:
 
 - **task-shaped workspace skills**, each with eval cases;
 - **`AGENTS.md` candidate lines** for the repo and team folders;
 - **workspace-instruction** and **Unity Catalog comment** proposals.
 
-It is built for repos that developers work in every day, that several teams share, and that change constantly. It extends the approach of [framework-skill-authoring](https://github.com/grusin-db/framework-skill-authoring), which documents a packaged library for agents that only have the installed package.
+It works on any repo and any docs, however a team works: it reads what is there, asks people to decide where sources disagree, and produces context in an open format (Agent Skills, `AGENTS.md`). It is built for repos that people work in every day, that several teams share, and that change constantly. It extends the approach of [framework-skill-authoring](https://github.com/grusin-db/framework-skill-authoring), which documents a packaged library for agents that only have the installed package.
 
 **Contents**
 
 1. [What it does](#1-what-it-does)
-2. [When to use it](#2-when-to-use-it)
-3. [Install](#3-install)
-4. [Use it](#4-use-it)
-5. [The phases](#5-the-phases)
-6. [What you get](#6-what-you-get)
-7. [Design principles](#7-design-principles)
-8. [How it differs from framework-skill-authoring](#8-how-it-differs-from-framework-skill-authoring)
-9. [What's in the meta-skill](#9-whats-in-the-meta-skill)
-10. [Next step: running it at scale](#10-next-step-running-it-at-scale)
-11. [Repository layout](#11-repository-layout)
-12. [Standards it follows](#12-standards-it-follows)
-13. [Known limitations](#13-known-limitations)
+2. [Key terms](#2-key-terms)
+3. [When to use it](#3-when-to-use-it)
+4. [Install](#4-install)
+5. [Use it](#5-use-it)
+6. [The phases](#6-the-phases)
+7. [What you get](#7-what-you-get)
+8. [Design principles](#8-design-principles)
+9. [How it differs from framework-skill-authoring](#9-how-it-differs-from-framework-skill-authoring)
+10. [What's in the meta-skill](#10-whats-in-the-meta-skill)
+11. [Adopting it in your organisation](#11-adopting-it-in-your-organisation)
+12. [Repository layout](#12-repository-layout)
+13. [Standards it follows](#13-standards-it-follows)
+14. [Known limitations](#14-known-limitations)
 
 ---
 
@@ -42,22 +43,39 @@ flowchart LR
 | Input | Output |
 | --- | --- |
 | A source repo checkout and the folders in scope | Draft skills in `skills/<prefix>-<verb>-<object>/`, each with `SKILL.md`, `skill.yaml` (owner, sources) and `evals/evals.json` |
-| Docs (Confluence pages via a connector, or exported pages) | `AGENTS.md` candidate lines with evidence, for people to write the file from |
+| Docs: Confluence or another wiki via a connector, Markdown in the repo, or exported pages | `AGENTS.md` candidate lines with evidence, for people to write the file from |
 | The owning team and its skill prefix | Workspace-instruction changes and Unity Catalog comments as proposals for their owners |
 | Existing skills, instructions and `AGENTS.md` files | A conflict list for people to decide, and a summary for the pull request |
 
 It has two modes: **create** (a repo, team or domain gets its context for the first time) and **update** (one skill's sources changed, or it gave a wrong answer).
 
-## 2. When to use it
+## 2. Key terms
+
+| Term | Meaning |
+| --- | --- |
+| Genie Code | The Databricks coding agent that reads the context this framework produces |
+| Context | Everything Genie Code reads besides the user's prompt: workspace instructions, `AGENTS.md` files, skills, Unity Catalog comments |
+| Skill | A folder with a `SKILL.md` that teaches the agent one task; Genie Code loads its description always and its body only when the task matches ([Agent Skills](https://agentskills.io/specification)) |
+| Meta-skill | A skill that writes skills; here `context-authoring` |
+| Source repo | The repo the context describes (your code) |
+| Context repo | The repo where your organisation keeps its skills and workspace instructions; called `genie-context` in these docs |
+| Run folder | Where one meta-skill run writes its working files: `authoring/runs/<date>-<scope>/` |
+| Platform team | The team that owns the context repo and the workspace instructions; in a small organisation it may be the only team |
+| Owning team | The team registered for a skill's name prefix; it maintains and approves that skill |
+| Contract | The few rules every team in a shared repo follows (written in the repo's root `AGENTS.md`); inside it, teams work their own way |
+| Variant | One team's way of doing a shared task, kept as a reference file inside the shared skill |
+| Eval verdict | ADDS VALUE, NO EFFECT or FAILING: whether a skill changes Genie Code's answers for the better |
+
+## 3. When to use it
 
 | Situation | Use |
 | --- | --- |
-| A repo developers work in: notebooks, metadata tables, deployment scripts, bundles, release process | **context-authoring** |
+| A repo people work in, with its own conventions and process: notebooks, pipelines, jobs, bundles, ML code, dashboards | **context-authoring** |
 | Several teams share one repo with different conventions | **context-authoring** (contract + team variants) |
 | Code and docs change daily and skills must keep up | **context-authoring** (update mode, per-skill sources) |
 | A packaged library (wheel, jar) used by people who don't have its source | [framework-skill-authoring](https://github.com/grusin-db/framework-skill-authoring) |
 
-## 3. Install
+## 4. Install
 
 The meta-skill is the folder [`context-authoring/`](context-authoring/). Copy it into your agent's skills folder:
 
@@ -72,13 +90,15 @@ Install it as a personal skill, not a workspace skill: it is an authoring tool f
 
 **Optional, recommended:** install the `skillkit` CLI from this repo (`pip install -e .`). The meta-skill then lints its output and runs evals with and without each skill. Without it, the meta-skill checks the output contract by hand and says in its summary that no evals ran. In Genie Code, where there is no terminal, clone this repo as a Git folder and run [`notebooks/run_skillkit.py`](notebooks/run_skillkit.py) instead.
 
-## 4. Use it
+## 5. Use it
 
 ### Create mode
 
-Open the agent where it can read the source repo, ideally inside your context repo (see [section 10](#10-next-step-running-it-at-scale)), and ask:
+Open the agent where it can read the source repo, ideally inside your context repo (see [Adopting it](#11-adopting-it-in-your-organisation)), and ask:
 
 > Use context-authoring in create mode for the data-platform repo, folders Databricks/Bronze and Databricks/Silver, team data-platform, prefix dp. Docs: the exported pages in ./docs-export/.
+
+Replace the repo, folders, team, prefix and docs with your own. All names in this README are from a fictional example.
 
 The meta-skill works in phases and writes every result to a run folder, `authoring/runs/<date>-<scope>/`. In Genie Code, start **each phase in a new thread** and point it at the run folder, so long chats don't degrade the output:
 
@@ -108,7 +128,7 @@ Each row gets a decision: **Variant**, **Align** (one way wins), **Fix code**, *
 
 It reads the skill, its recorded sources and only the diff, then edits the fewest lines that make the skill true again, so earlier manual fixes survive. A reported wrong answer first becomes a failing eval case.
 
-## 5. The phases
+## 6. The phases
 
 | # | Phase | What happens | Writes |
 | --- | --- | --- | --- |
@@ -122,7 +142,7 @@ It reads the skill, its recorded sources and only the diff, then edits the fewes
 | 8 | Validate | Lint; check every name against the code; evals with and without each skill; drop skills with no effect | Eval report |
 | 9 | Hand over | Summary for the pull request | `summary.md` |
 
-## 6. What you get
+## 7. What you get
 
 ```
 authoring/runs/2026-11-24-silver/
@@ -144,7 +164,7 @@ skills/dp-create-silver-table/
 
 See [`skills/dp-create-silver-table/`](skills/dp-create-silver-table/) and [`examples/data-platform/`](examples/data-platform/) for a fictional worked example.
 
-## 7. Design principles
+## 8. Design principles
 
 **Each piece of knowledge goes in the cheapest layer that works.**
 
@@ -166,7 +186,7 @@ See [`skills/dp-create-silver-table/`](skills/dp-create-silver-table/) and [`exa
 - **One shared task, one skill.** When teams differ, the skill gets a variant per team instead of competing duplicates.
 - **Keep human edits.** Update mode changes only what its sources changed.
 
-## 8. How it differs from framework-skill-authoring
+## 9. How it differs from framework-skill-authoring
 
 [framework-skill-authoring](https://github.com/grusin-db/framework-skill-authoring) is an excellent method for packaged libraries. This meta-skill keeps its analysis and validation ideas and changes what fits a platform repo.
 
@@ -181,7 +201,7 @@ See [`skills/dp-create-silver-table/`](skills/dp-create-silver-table/) and [`exa
 | After generation | Regenerate by hand | Per-skill sources, update mode, freshness checks |
 | **Kept from it** | | Inventory with sources, vocabularies as term/values/default/consequence, config-not-literals, leakage scan, "verify against the code" pass |
 
-## 9. What's in the meta-skill
+## 10. What's in the meta-skill
 
 ```
 context-authoring/
@@ -198,36 +218,48 @@ context-authoring/
     └── AGENTS.team.md                       team-folder AGENTS.md template
 ```
 
-## 10. Next step: running it at scale
+## 11. Adopting it in your organisation
 
-The meta-skill produces drafts. To run context for a whole organisation, this repo also contains the tooling for a central context repo (`genie-context`):
+Adopt it in stages; each stage is useful on its own.
+
+| Stage | Who | What | Result |
+| --- | --- | --- | --- |
+| 1. Try it | One person | Install the meta-skill, run create mode on one folder of one repo, decide the conflicts, check two prompts in Genie Code with the drafts installed as personal skills | A few draft skills, and a list of the conventions and conflicts in that area |
+| 2. Set up the context repo | Platform team | Create a repo from this framework; adapt `standard.yaml` (teams, prefixes, forbidden patterns), the workspace instructions and the example content; install `skillkit`; lint and run evals locally; write the source repo's `AGENTS.md` from the candidate lines | Reviewed skills that measurably help, in version control |
+| 3. Automate | Platform team | Add the CI pipelines (GitHub Actions or Azure DevOps): PR validation with eval reports, deployment to dev then prod; lock the workspace skills folder so only the pipeline writes it | Every change reviewed and evaluated; one writer per workspace |
+| 4. Keep it current and grow | Owning teams | Add the freshness hook to source repos and the weekly maintenance run; onboard more teams with their prefix, reviewers and team `AGENTS.md` | Skills that follow the code; more teams under one standard |
+
+Stages 2–4 use the tooling in this repo:
 
 - **A standard** ([`docs/STANDARD.md`](docs/STANDARD.md), [`standard.yaml`](standard.yaml)): limits, team prefixes, sections, forbidden patterns.
-- **The `skillkit` CLI**: deterministic lint, evals with baseline and repeated runs, build with checksums, deploy to workspaces, freshness checks against code and Confluence.
-- **Azure DevOps pipelines**: PR validation with eval reports, deployment to dev then prod, a weekly maintenance run, and a hook that tells source-repo PRs which skills they affect.
+- **The `skillkit` CLI**: deterministic lint, evals with baseline and repeated runs, build with checksums, deploy to workspaces, freshness checks against code and docs.
+- **CI pipelines** for GitHub Actions and Azure DevOps: PR validation, deployment, weekly maintenance, and a hook that tells source-repo PRs which skills they affect.
 
 Setup, operation and reference: **[docs/operating.md](docs/operating.md)**.
 
-## 11. Repository layout
+## 12. Repository layout
 
 ```
 skill-authoring-framework/
 ├── context-authoring/          the meta-skill: install this
-├── skills/                     example generated skill (fictional)
-├── examples/data-platform/     example AGENTS.md and its eval cases (fictional)
 ├── docs/
 │   ├── STANDARD.md             the standard generated context follows
 │   └── operating.md            running it at scale: setup, CLI, evals, deploy, updates
-├── standard.yaml               configurable limits, teams, prefixes
+├── standard.yaml               configurable limits, teams, prefixes (example values)
 ├── context/                    example workspace instructions
+├── skills/                     example generated skill (fictional)
+├── examples/data-platform/     example AGENTS.md and its eval cases (fictional)
 ├── skillkit/                   the CLI (Python)
 ├── notebooks/run_skillkit.py   the CLI inside a Databricks workspace
-├── pipelines/                  Azure DevOps pipelines
+├── pipelines/
+│   ├── github-actions/         workflows to copy into your context repo and source repos
+│   └── azure-devops/           the same for Azure DevOps
 ├── evals/decoys.yaml           stand-ins for built-in skills in routing tests
-└── tests/                      unit tests
+├── tests/                      unit tests
+└── .github/workflows/ci.yml    CI for this repo
 ```
 
-## 12. Standards it follows
+## 13. Standards it follows
 
 | Source | Applied to |
 | --- | --- |
@@ -238,9 +270,9 @@ skill-authoring-framework/
 | [Evaluating AGENTS.md (ETH Zurich)](https://arxiv.org/html/2602.11988v1) | Human-written, minimal, evaluated `AGENTS.md` |
 | [framework-skill-authoring](https://github.com/grusin-db/framework-skill-authoring) | Analysis method, vocabularies, validation ideas |
 
-## 13. Known limitations
+## 14. Known limitations
 
 - **Undocumented Genie Code behaviour.** Precedence between nested `AGENTS.md` files and workspace instructions, which Genie Code modes read `AGENTS.md`, and whether a skill named in another skill's steps gets loaded are not documented. Test them before relying on them.
 - **Evals are a simulation** through model serving endpoints, not the Genie Code agent itself. Check each new skill with two prompts in a real Agent-mode chat.
-- **Deploy and pipelines are tested with mocks only.** Start in a dev workspace with `--dry-run`.
+- **Deploy and the CI pipelines are tested with mocks only**; the GitHub Actions and Azure DevOps workflows have not run against a real workspace yet. Start in a dev workspace with `--dry-run`.
 - **The example skill is fictional** and contains `TODO` markers.

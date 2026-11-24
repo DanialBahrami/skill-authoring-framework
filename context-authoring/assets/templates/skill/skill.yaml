@@ -13,6 +13,9 @@ sources:
   #     page_id: "123456"
   #     title: Page title
   #     version: 1          # keep page_id before version; confluence-check --write updates it
+  # - doc:                # any other wiki or website; reviewed by age
+  #     url: https://wiki.example.org/how-we-do-x
+  #     title: How we do X
   # - note: Agreed in the platform guild on how X is done (no written source)
 
 # Skills this one names in its steps (building blocks it uses). Name each one in

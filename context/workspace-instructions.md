@@ -1,5 +1,7 @@
 # Workspace instructions
 
+<!-- EXAMPLE: replace the environments and rules with your organisation's own. -->
+
 Deployed to /Workspace/.assistant_workspace_instructions.md by the genie-context pipeline.
 Do not edit in the workspace; change it in the genie-context repo.
 

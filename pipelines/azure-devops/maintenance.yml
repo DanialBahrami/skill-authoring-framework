@@ -58,9 +58,8 @@ steps:
     workingDirectory: $(Pipeline.Workspace)/s/genie-context
     env:
       DATABRICKS_HOST: $(DATABRICKS_HOST)
-      ARM_CLIENT_ID: $(ARM_CLIENT_ID)
-      ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
-      ARM_TENANT_ID: $(ARM_TENANT_ID)
+      DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+      DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
 
   - script: skillkit catalog | tee $(Build.ArtifactStagingDirectory)/catalog.txt
     displayName: Budget usage
@@ -73,7 +72,7 @@ steps:
   - script: |
       echo "One or more checks found work. See the maintenance artifact:"
       echo "  stale.txt       -> owner re-checks the skill, runs 'skillkit reviewed <name>' or deprecates it"
-      echo "  confluence.txt  -> owner updates the skill (generator update mode), then 'confluence-check <name> --write'"
+      echo "  confluence.txt  -> owner updates the skill (meta-skill update mode), then 'confluence-check <name> --write'"
       echo "  eval-report.md  -> owner reads the failing answer and fixes the skill or the case"
       exit 1
     displayName: Fail if any check found work

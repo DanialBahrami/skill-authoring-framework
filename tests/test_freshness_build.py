@@ -157,3 +157,11 @@ def test_checksums_detect_changes(repo: Path, tmp_path: Path):
     assert verify_build(out) == []
     (out / "skills" / "dp-prepare-pr" / "SKILL.md").write_text("tampered")
     assert verify_build(out) == ["skills/dp-prepare-pr/SKILL.md"]
+
+
+def test_reviewers_formats(repo: Path, capsys):
+    cli.main(["--root", str(repo), "reviewers"])
+    out = capsys.readouterr().out
+    assert "/skills/dp-*/  @my-org/data-platform" in out
+    cli.main(["--root", str(repo), "reviewers", "--format", "azure-devops"])
+    assert "Data Platform Team" in capsys.readouterr().out

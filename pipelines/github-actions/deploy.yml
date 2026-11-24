@@ -1,0 +1,80 @@
+# Deploys active skills and workspace instructions after a merge to main.
+# Copy to .github/workflows/ in your genie-context repo.
+#
+# Create two GitHub environments, genie-context-dev and genie-context-prod (add required
+# reviewers to prod), each with secrets DATABRICKS_HOST, DATABRICKS_CLIENT_ID,
+# DATABRICKS_CLIENT_SECRET. Optional environment variable DEPLOY_FLAGS=--no-prune while
+# legacy workspace skills are still being imported.
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths: [skills/**, context/**, standard.yaml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e .
+      - name: Lint and build
+        run: skillkit build --out bundle
+      - uses: actions/upload-artifact@v4
+        with: { name: bundle, path: bundle }
+
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: genie-context-dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e ".[databricks]"
+      - uses: actions/download-artifact@v4
+        with: { name: bundle, path: bundle }
+      - name: Plan
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: skillkit deploy --build bundle --dry-run ${{ vars.DEPLOY_FLAGS }}
+      - name: Deploy
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: skillkit deploy --build bundle ${{ vars.DEPLOY_FLAGS }}
+
+  deploy-prod:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: genie-context-prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e ".[databricks]"
+      - uses: actions/download-artifact@v4
+        with: { name: bundle, path: bundle }
+      - name: Plan
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: skillkit deploy --build bundle --dry-run ${{ vars.DEPLOY_FLAGS }}
+      - name: Deploy
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: skillkit deploy --build bundle ${{ vars.DEPLOY_FLAGS }}
+

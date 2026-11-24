@@ -1,7 +1,7 @@
 ---
 name: context-authoring
 description: >-
-  Generates and updates Genie Code context for a data platform repo from its code and
+  Generates and updates Databricks Genie Code context for a repo from its code and
   documentation: task-shaped workspace skills with evals, AGENTS.md candidate lines,
   workspace-instruction proposals and Unity Catalog comment proposals. Use when asked to
   create skills for a repo, team or domain, to onboard a team to Genie Code, to update a
@@ -10,7 +10,7 @@ description: >-
 
 # Context authoring
 
-Turns a repo that developers work in (and its Confluence or other docs) into the context Genie Code needs, each piece in the cheapest place: workspace instructions, `AGENTS.md`, skills, Unity Catalog comments. Two modes:
+Turns a repo that people work in (data engineering, ML, analytics or apps on Databricks) and its documentation (wiki pages, Markdown, exported pages) into the context Genie Code needs, each piece in the cheapest place: workspace instructions, `AGENTS.md`, skills, Unity Catalog comments. Two modes:
 
 - **create**: a repo, team or domain gets its context for the first time. Follow the steps below.
 - **update**: one skill's sources changed or it gave a wrong answer. Follow [references/update-mode.md](references/update-mode.md) instead.
@@ -21,7 +21,7 @@ Turns a repo that developers work in (and its Confluence or other docs) into the
 
 ## Steps
 
-1. **Scope.** Get from the user: the source repo path, the folders in scope, the owning team and its skill prefix, and the docs (a connector, or exported pages in a folder). Create the run folder.
+1. **Scope.** Get from the user: the source repo path, the folders in scope, the owning team and its skill prefix, and the docs (a connector such as Confluence, Markdown in the repo, or exported pages in a folder). Create the run folder.
 2. **Load what exists.** List the existing skills and their descriptions (`skillkit catalog`), the workspace instructions, and every `AGENTS.md` in the source repo. New output must not repeat or silently contradict them.
 3. **Analyze.** Fill [assets/templates/run/inventory.md](assets/templates/run/inventory.md): tasks people repeat ("onboard a source table", not "PySpark") with their sub-steps and whether people ask for each on its own, shared helpers with their signatures, config and metadata, vocabularies (term, values, default, consequence), guardrails, folders and owners. Cite a source for every fact. Read code before docs; where they disagree, the code is the current state.
 4. **Classify.** Put each item in exactly one layer with [references/layer-classification.md](references/layer-classification.md), in [assets/templates/run/classification.md](assets/templates/run/classification.md). Public Databricks knowledge is dropped.
