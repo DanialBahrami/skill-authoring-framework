@@ -92,7 +92,8 @@ class ServingLLM:
         )
         usage = getattr(resp, "usage", None)
         self.last_tokens = getattr(usage, "total_tokens", None) if usage else None
-        self.last_truncated = getattr(resp.choices[0], "finish_reason", None) == "length"
+        reason = getattr(resp.choices[0], "finish_reason", None)   # a string or an enum, by SDK version
+        self.last_truncated = str(getattr(reason, "value", reason) or "").lower().endswith("length")
         content = resp.choices[0].message.content
         if isinstance(content, list):  # some endpoints return content parts
             content = "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
@@ -206,7 +207,7 @@ def _arm(llm: LLM, model: str, system: str, case: dict[str, Any], judge_ep: str,
         cuts.append(_truncated(llm))
         ok, notes = score_answer(answer, case, llm, judge_ep, max(max_tokens, 1000))
         if checker is not None:
-            report = checker.check(answer, case.get("exec_new_tables"))
+            report = checker.check(answer, case.get("exec_new_tables"), case.get("exec_new_columns"))
             sql = report.summary()
             if report.invalid:
                 ok, notes = False, notes + report.notes()

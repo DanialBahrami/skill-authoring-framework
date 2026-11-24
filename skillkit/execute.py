@@ -42,6 +42,8 @@ STRING_RE = re.compile(r"'(?:[^'\\]|\\.)*'")
 QUALIFIED_RE = re.compile(r"(?<![\w.`])(`?[A-Za-z_][\w-]*`?)\.(`?[\w-]+`?)\.(`?[\w-]+`?)(?![\w.`]|\s*\()")
 DOTTED_RE = re.compile(r"[`\w]+(?:\.[`\w]+){1,2}")
 UNQUALIFIED_RE = re.compile(r"(?i)\b(?:from|join|into|using|update|table)\s+(`?[A-Za-z_]\w*`?)(?![\w`]*\.)(?!\s*\()")
+ADDED_COLUMNS_RE = re.compile(r"(?is)\bADD\s+COLUMNS?\s*\(?\s*(.*?)(?:\)\s*$|$)")
+UNRESOLVED_NAME_RE = re.compile(r"UNRESOLVED_(?:COLUMN|FIELD)[^\]]*\][^`]*`([^`]+)`")
 MISSING_NAME_RE = re.compile(r"TABLE_OR_VIEW_NOT_FOUND\].*?(`[^`]+`(?:\.`[^`]+`)*)", re.S)
 ALLOWED_PREFIXES = ("EXPLAIN ", "DESCRIBE TABLE ")
 
@@ -145,6 +147,7 @@ def substitute(sql: str, variables: dict[str, str]) -> str:
         sql = re.sub(rf"\$\{{\s*{n}\s*\}}|\{{\{{\s*{n}\s*\}}\}}|(?<![{{\w])\{{\s*{n}\s*\}}(?!\}})", value, sql)
         sql = re.sub(rf"IDENTIFIER\(\s*:{n}\s*\)", value, sql, flags=re.I)
         sql = re.sub(rf"(?<![:\w]):{n}\b", value, sql)
+        sql = re.sub(rf"(?<![\w$])\${n}\b(?!\{{)", value, sql)   # legacy widget syntax: $name
     return sql
 
 
@@ -185,15 +188,22 @@ class SqlChecker:
         # Catalogs whose fully qualified tables get DESCRIBE TABLE; default: the variable values,
         # so `${catalog}.s.t` filled with the dev catalog is described, `alias.struct.field` is not.
         self.catalogs = {c.lower() for c in (catalogs if catalogs is not None else self.variables.values()) if c}
+        self._added: set[str] = set()
 
     def _run(self, statement: str) -> tuple[bool, str]:
         guard(statement)
         return self.runner(statement)
 
-    def check(self, answer: str, new_tables: Iterable[str] | None = None) -> SqlReport:
+    def check(self, answer: str, new_tables: Iterable[str] | None = None,
+              new_columns: Iterable[str] | None = None) -> SqlReport:
         report = SqlReport()
         new = [re.compile(p, re.I) for p in (new_tables or [])]
         statements = [substitute(raw, self.variables) for raw in extract_sql(answer)]
+        # Columns the answer adds (ALTER TABLE ... ADD COLUMN[S]) or the case lists do not exist yet.
+        self._added = {c.lower() for c in (new_columns or [])}
+        for stmt in statements:
+            for body in ADDED_COLUMNS_RE.findall(stmt):
+                self._added |= {m.lower() for m in re.findall(r"(?:^|,)\s*`?(\w+)`?\s+[A-Za-z]", body)}
         created: set[str] = set()
         for stmt in statements:
             match = CREATE_RE.match(stmt)
@@ -265,6 +275,10 @@ class SqlChecker:
             report.checks.append(SqlCheck(stmt, "ok"))
             return
         status, detail = classify(text)
+        unresolved = UNRESOLVED_NAME_RE.search(text)
+        if status == "invalid" and unresolved and unresolved.group(1).split(".")[-1].lower() in self._added:
+            report.checks.append(SqlCheck(stmt, "skipped", f"column {unresolved.group(1)} is added by the answer"))
+            return
         missing = MISSING_NAME_RE.search(text)
         if status == "invalid" and missing:
             name = _norm(missing.group(1))
@@ -300,7 +314,11 @@ class SqlChecker:
             yaml.safe_load(body)
             report.checks.append(SqlCheck(body, "ok", "yaml"))
         except yaml.YAMLError as exc:
-            report.checks.append(SqlCheck(body, "invalid", f"yaml: {str(exc).splitlines()[0]}"))
+            first = next((ln for ln in body.splitlines() if ln.strip()), "")
+            if first[:1].isspace():   # an indented excerpt of a larger file ("add under variables:")
+                report.checks.append(SqlCheck(body, "skipped", "yaml excerpt, not checkable on its own"))
+            else:
+                report.checks.append(SqlCheck(body, "invalid", f"yaml: {str(exc).splitlines()[0]}"))
 
 
 def warehouse_runner(warehouse_id: str, profile: str | None = None, timeout: str = "30s") -> Runner:

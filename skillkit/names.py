@@ -77,6 +77,11 @@ def candidate(span: str) -> str | None:
 def _found(name: str, idxs: list[RepoIndex]) -> bool:
     low = name.lower().lstrip("./")
     for idx in idxs:
+        if "/" in low and "*" in low:   # a glob such as Deployment/*.sql
+            glob = re.compile("(^|/)" + re.escape(low).replace(r"\*\*", ".*").replace(r"\*", "[^/]*") + "$")
+            if any(glob.search(p) for p in idx.paths):
+                return True
+            continue
         if "/" in low:
             if low in idx.paths or any(p.endswith("/" + low) or p.endswith(low) for p in idx.paths):
                 return True
@@ -90,12 +95,14 @@ def _found(name: str, idxs: list[RepoIndex]) -> bool:
 
 
 def spans(skill: Skill) -> list[tuple[str, str]]:
-    """(file, span) for every inline code span in SKILL.md and references/*.md, outside fenced blocks."""
+    """(file, span) for every inline code span in SKILL.md, references/*.md and Markdown in assets/,
+    outside fenced blocks."""
     files = [("SKILL.md", skill.body)]
-    ref_dir = skill.path / "references"
-    if ref_dir.is_dir():
-        files += [(p.relative_to(skill.path).as_posix(), p.read_text(encoding="utf-8"))
-                  for p in sorted(ref_dir.rglob("*.md"))]
+    for folder in ("references", "assets"):
+        base = skill.path / folder
+        if base.is_dir():
+            files += [(p.relative_to(skill.path).as_posix(), p.read_text(encoding="utf-8"))
+                      for p in sorted(base.rglob("*.md"))]
     out = []
     for rel, text in files:
         for match in SPAN_RE.finditer(FENCE_RE.sub("", text)):
@@ -103,13 +110,14 @@ def spans(skill: Skill) -> list[tuple[str, str]]:
     return out
 
 
-def check_skill(skill: Skill, idxs: list[RepoIndex], skill_names: set[str]) -> list[tuple[str, str]]:
+def check_skill(skill: Skill, idxs: list[RepoIndex], skill_names: set[str],
+                ignore: set[str] | None = None) -> list[tuple[str, str]]:
     """Return (file, name) for names not found in any source repo."""
     own = {p.relative_to(skill.path).as_posix().lower() for p in skill.path.rglob("*") if p.is_file()}
     missing, seen = [], set()
     for rel, span in spans(skill):
         name = candidate(span)
-        if not name or name in seen or name in skill_names:
+        if not name or name in seen or name in skill_names or name in (ignore or set()):
             continue
         seen.add(name)
         if name.lower().lstrip("./") in own:

@@ -56,8 +56,9 @@ skills/<prefix>-<verb>-<object>/
 - When good answers span several files and get cut off, set `eval: max_tokens` in `skill.yaml` instead of shortening the case.
 - At least one near miss that shares vocabulary but belongs to another skill or to none; set `expect_skill` when the right skill is known.
 - `agents:` lists the `AGENTS.md` files Genie Code would have loaded for that prompt.
-- `exec_new_tables:` (optional) regexes of tables the task creates and that do not exist yet, so the execution gate does not count them as invented.
+- `exec_new_tables:` / `exec_new_columns:` (optional) regexes of tables, and names of columns, the task creates and that do not exist yet, so the execution gate does not count them as invented. Columns added with `ALTER TABLE ... ADD COLUMN(S)` in the answer are recognised without listing them.
+- `must_not_include` for environment values (catalog names, storage accounts, hosts) targets the place where the value does harm, not every mention: a literal catalog as the target of DDL or DML, or a literal value in bundle YAML, fails; a widget default or a development-only check the repo itself uses does not. Try a new pattern against a few lines of real repo code before adding it, or it fails good answers.
 
 ## evals/journeys.json (context repo)
 
-A skill that uses other skills gets a journey: `id`, `prompt` (a task that needs the chain), `skills` (where it starts first, then the skills it hands over to), and the same `agents`, `must_include`, `must_not_include`, `assertions` and `exec_new_tables` as a case. Every skill after the first must be reachable from it through `uses`, because that is the only way Genie Code gets there. Check what only passes when the hand-over worked: a name from a later skill, the table one step creates being the one the next step uses.
+A skill that uses other skills gets a journey: `id`, `prompt` (a task that needs the chain), `skills` (where it starts first, then the skills it hands over to), and the same `agents`, `must_include`, `must_not_include`, `assertions`, `exec_new_tables` and `exec_new_columns` as a case. Every skill after the first must be reachable from it through `uses`, because that is the only way Genie Code gets there. Check what only passes when the hand-over worked: a name from a later skill, the table one step creates being the one the next step uses.

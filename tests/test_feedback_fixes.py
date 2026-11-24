@@ -160,3 +160,76 @@ def test_genie_checklist(repo: Path, tmp_path: Path):
     assert "## dp-prepare-pr" in text and "Write the PR description" in text
     assert "Matches `impact`" in text and "Uses the hotfix branch" in text
     assert "pr-nm-01" not in text
+
+
+def test_added_columns_and_yaml_excerpts_and_bare_widgets():
+    from skillkit.execute import SqlChecker, substitute
+
+    def runner(st):
+        if st.startswith("EXPLAIN") and "contract_end_date" in st:
+            return True, ("Error occurred during query planning: [UNRESOLVED_COLUMN.WITH_SUGGESTION] A column with "
+                          "name `contract_end_date` cannot be resolved.")
+        return True, "== Physical Plan =="
+
+    added = ("```sql\nALTER TABLE dev.s.t ADD COLUMNS (contract_end_date DATE COMMENT 'end');\n"
+             "SELECT id, contract_end_date FROM dev.s.t\n```")
+    report = SqlChecker(runner, {"catalog": "dev"}).check(added)
+    assert not report.invalid and any("added by the answer" in c.detail for c in report.checks)
+    invented = "```sql\nSELECT id, contract_end_date FROM dev.s.t\n```"
+    assert SqlChecker(runner, {"catalog": "dev"}).check(invented).invalid
+    assert not SqlChecker(runner, {"catalog": "dev"}).check(invented, new_columns=["contract_end_date"]).invalid
+
+    excerpt = "```yaml\n   pause_status:\n    default: PAUSED\n\ntargets:\n  prod: {}\n```"
+    checks = SqlChecker(runner).check(excerpt).checks
+    assert checks[0].status == "skipped" and "excerpt" in checks[0].detail
+    assert substitute("SELECT * FROM $catalog.s.t WHERE x = '${catalog}'", {"catalog": "dev"}) == \
+        "SELECT * FROM dev.s.t WHERE x = 'dev'"
+
+
+def test_finish_reason_enum_and_unverifiable_assertions(repo: Path):
+    import enum
+    import types
+
+    from skillkit.evals import ServingLLM
+
+    class Reason(enum.Enum):
+        LENGTH = "length"
+
+    llm = ServingLLM.__new__(ServingLLM)
+    resp = types.SimpleNamespace(usage=None, choices=[types.SimpleNamespace(
+        finish_reason=Reason.LENGTH, message=types.SimpleNamespace(content="partial"))])
+    llm.w = types.SimpleNamespace(serving_endpoints=types.SimpleNamespace(query=lambda **kw: resp))
+    llm.last_tokens, llm.last_truncated = None, False
+    assert llm.complete("ep", "sys", "user", 10) == "partial" and llm.last_truncated
+
+    evals = repo / "skills" / "dp-prepare-pr" / "evals" / "evals.json"
+    data = json.loads(evals.read_text())
+    data["evals"][0]["assertions"] = ["Names the latest release branch", "Lists the existing downstream tables",
+                                      "Uses the real merge helper", "Gives the query that lists downstream tables"]
+    evals.write_text(json.dumps(data))
+    warned = [f.message for f in lint.lint_skill(load_skill(repo / "skills" / "dp-prepare-pr"), load_standard(repo))
+              if f.code == "SK023"]
+    assert len(warned) == 2 and "latest release branch" in warned[0]
+
+
+def test_check_names_ignore_assets_and_globs(repo: Path, tmp_path: Path, capsys):
+    src = tmp_path / "source"
+    (src / "Deployment").mkdir(parents=True)
+    (src / "Deployment" / "add_column.sql").write_text("-- x\n")
+    folder = repo / "skills" / "dp-prepare-pr"
+    (folder / "assets").mkdir(exist_ok=True)
+    (folder / "assets" / "checklist.md").write_text("Use `asset_only_helper` and `Deployment/*.sql`.\n")
+    md = folder / "SKILL.md"
+    md.write_text(md.read_text().replace("2. Fill", "2. Ask the user for `ticket_key_from_user`. Fill"))
+    main(["--root", str(repo), "check-names", "--repo", str(src)])
+    out = capsys.readouterr().out
+    assert "asset_only_helper" in out and "ticket_key_from_user" in out and "Deployment/*.sql" not in out
+    main(["--root", str(repo), "check-names", "--repo", str(src), "--ignore", "ticket_key_from_user"])
+    assert "ticket_key_from_user" not in capsys.readouterr().out.split("\n\n")[0]
+
+
+def test_journey_regex_is_checked(repo: Path):
+    (repo / "evals").mkdir(exist_ok=True)
+    (repo / "evals" / "journeys.json").write_text(json.dumps({"journeys": [
+        {"id": "j", "prompt": "p", "skills": ["dp-prepare-pr", "dp-prepare-pr"], "must_include": ["(unclosed"]}]}))
+    assert any("bad regex" in f.message for f in lint.lint_journeys(repo, load_skills(repo)))

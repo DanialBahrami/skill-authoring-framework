@@ -8,5 +8,6 @@ Triggered by a freshness comment on a source-repo PR, a changed doc page, a fail
 4. Edit the smallest set of lines that makes the skill true again. Keep everything else byte for byte: other lines may hold fixes people made after evals.
 5. A reported wrong answer: first add it to `evals/evals.json` as a case that fails today, then change the skill until it passes.
 6. Adjust `sources` if files moved. Run `skillkit reviewed <name>` and, for Confluence sources, `skillkit confluence-check <name> --write`.
-7. Run `skillkit lint <name>` and `skillkit eval <name>`. All cases pass before the PR.
-8. Open the PR with: trigger, what changed in the skill, eval report.
+7. Check the journeys in `evals/journeys.json` that include this skill: if what the skill produces or expects changed (a table name, a parameter, a step), update their checks too.
+8. Run `skillkit lint` and `skillkit eval <name>`; the eval also runs the journeys that include the skill. All cases and journeys pass before the PR.
+9. Open the PR with: trigger, what changed in the skill and its journeys, eval report.

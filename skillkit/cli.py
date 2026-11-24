@@ -117,7 +117,7 @@ def cmd_check_names(args) -> int:
     names = {s.name for s in skills}
     total = 0
     for skill in targets:
-        missing = check_skill(skill, idxs, names)
+        missing = check_skill(skill, idxs, names, set(args.ignore or []))
         total += len(missing)
         for rel, name in missing:
             print(f"NOT FOUND {skill.name}/{rel}: `{name}`")
@@ -358,7 +358,8 @@ def cmd_eval(args) -> int:
             if r.case_id == args.inspect:
                 print(f"\n=== {r.skill}/{r.case_id} with skill ===\n{r.with_skill_answer}")
                 print(f"\n=== without skill ===\n{r.baseline_answer}")
-    failing = any(v.verdict == "FAILING" for v in verdicts) or journeys_failing(journey_results)
+    # INCONCLUSIVE also fails: nothing was verified, so it must not pass a blocking gate
+    failing = any(v.verdict in ("FAILING", "INCONCLUSIVE") for v in verdicts) or journeys_failing(journey_results)
     no_effect = any(v.verdict == "NO EFFECT" for v in verdicts)
     return 1 if failing or (no_effect and args.require_value) else 0
 
@@ -449,6 +450,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("skills", nargs="*", help="only these skills (default: all)")
     s.add_argument("--repo", action="append", required=True, help="source repo checkout; repeat for several")
     s.add_argument("--strict", action="store_true", help="exit 1 when a name is not found")
+    s.add_argument("--ignore", nargs="*", help="names that legitimately appear in no file (from docs, typed by users)")
     s.set_defaults(func=cmd_check_names)
 
     s = sub.add_parser("genie-checklist", help="prompts to paste in Genie Code and what to look for, per skill")

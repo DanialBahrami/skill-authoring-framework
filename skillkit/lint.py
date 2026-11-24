@@ -2,7 +2,7 @@
 
 Each finding has a code so reviewers and docs can refer to it:
 
-  SK001-SK021  one skill
+  SK001-SK023  one skill
   CT001-CT004  the catalog of skills
   WI001-WI003  workspace instructions
   AG001-AG002  AGENTS.md files
@@ -31,6 +31,15 @@ TODO_RE = re.compile(r"\bTODO\b")
 CONTENTS_RE = re.compile(r"(?im)^#{1,6}\s*contents\b")
 ALLOWED_FRONTMATTER = set(SPEC_FRONTMATTER)   # Agent Skills specification fields
 WORD_RE = re.compile(r"[a-z0-9]+")
+# Assertions an eval model cannot satisfy without running anything: live values and lookups.
+UNVERIFIABLE_ASSERTION_RES = [
+    re.compile(r"(?i)\b(latest|newest|most recent|today'?s|current)\b.*\b(branch|date|version|run|release)\b"),
+    re.compile(r"(?i)\b(lists?|names?|returns?|shows?)\b.*\b(actual|existing|downstream|live)\b.*"
+               r"\b(tables?|views?|rows?|jobs?|columns?|values?)\b"),
+    re.compile(r"(?i)\b(row|record) counts?\b|\bhow many rows\b"),
+]
+# ...unless the assertion asks for the way to find out, which the model can give.
+ASKS_FOR_METHOD_RE = re.compile(r"(?i)\b(query|queries|sql|command|statement|step|steps|how to|code)\b")
 STOPWORDS = {"the", "a", "an", "and", "or", "to", "of", "in", "for", "on", "with", "when", "use", "user", "asks",
              "is", "it", "this", "that", "by", "as", "from", "not", "skill", "be", "are", "any", "into"}
 
@@ -241,6 +250,10 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
                 _err(out, "SK015", where, f"case {case.get('id')}: prompt is empty")
             if case.get("type") == "trigger" and not (case.get("must_include") or case.get("rubric")):
                 _err(out, "SK015", where, f"case {case.get('id')}: trigger cases need must_include or assertions")
+            for item in case.get("rubric", []) or []:
+                if any(r.search(str(item)) for r in UNVERIFIABLE_ASSERTION_RES) and not ASKS_FOR_METHOD_RE.search(str(item)):
+                    _warn(out, "SK023", where, f"case {case.get('id')}: '{item}' needs facts the model cannot know "
+                          "without running anything; expect the query or the step instead")
             for key in ("must_include", "must_not_include"):
                 for pattern in case.get(key, []) or []:
                     try:
@@ -432,6 +445,12 @@ def lint_journeys(root, skills: list[Skill]) -> list[Finding]:
                 _err(out, "JR001", where, f"unknown skill '{name}'")
             elif status[name] == "deprecated":
                 _err(out, "JR001", where, f"skill '{name}' is deprecated")
+        for key in ("must_include", "must_not_include"):
+            for pattern in j.get(key) or []:
+                try:
+                    re.compile(pattern)
+                except re.error as exc:
+                    _err(out, "JR001", where, f"bad regex in {key}: {exc}")
         if not (j.get("must_include") or j.get("assertions")):
             _warn(out, "JR001", where, "no must_include or assertions: the journey can only fail on routing")
         # Genie Code reaches a later skill only if an earlier one names it (listed in `uses`).
