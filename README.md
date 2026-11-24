@@ -199,7 +199,8 @@ See [`skills/dp-create-silver-table/`](skills/dp-create-silver-table/) and [`exa
 | Size | Up to about 500 lines per skill | About 200 lines and 2,500 tokens; catalog budget |
 | Validation | Checklists and source-blind simulation | Lint plus evals with and without each skill |
 | After generation | Regenerate by hand | Per-skill sources, update mode, freshness checks |
-| **Kept from it** | | Inventory with sources, vocabularies as term/values/default/consequence, config-not-literals, leakage scan, "verify against the code" pass |
+| **Kept from it** | | Signal-by-signal analysis guide, inventory with sources, vocabularies as term/values/default/consequence, config-not-literals, consent gates at the risky step, degrees of freedom, leakage scan, symptom-to-fix table, a real-agent check per task |
+| **Left out on purpose** | | The capability-domain list as a skill list (kept only as a task checklist), decision-tree catalog and router (a decision is a step with its condition), "Before you start", troubleshooting and related-skills sections (they push skills past the size limit; troubleshooting worth keeping is a reference file) |
 
 ## 10. What's in the meta-skill
 
@@ -207,12 +208,16 @@ See [`skills/dp-create-silver-table/`](skills/dp-create-silver-table/) and [`exa
 context-authoring/
 ├── SKILL.md                                 the workflow (both modes)
 ├── references/
+│   ├── analyze.md                           where to find tasks, helpers, vocabularies and guardrails in code, docs and history
 │   ├── layer-classification.md              which layer a fact belongs in
 │   ├── conflict-report.md                   conflict decisions and who makes them
-│   ├── output-contract.md                   what a generated skill must look like
+│   ├── output-contract.md                   what a generated skill must contain
+│   ├── writing-skills.md                    how to write steps, decisions, guards and examples the agent follows
+│   ├── validation.md                        manual lint checklist, evals, the Genie Code check, symptoms and fixes
 │   └── update-mode.md                       updating one skill
 └── assets/templates/
-    ├── run/                                 inventory, classification, conflicts, AGENTS.md candidates, summary
+    ├── run/                                 inventory, classification, conflicts, AGENTS.md candidates,
+    │                                        workspace-instruction and UC-comment proposals, summary
     ├── skill/                               SKILL.md, skill.yaml, evals/evals.json
     ├── AGENTS.repo.md                       root AGENTS.md template
     └── AGENTS.team.md                       team-folder AGENTS.md template

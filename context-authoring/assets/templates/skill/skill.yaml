@@ -6,7 +6,7 @@ last_reviewed: {{today}}
 
 # Where the knowledge came from. Drives the freshness checks.
 sources:
-  - repo: TODO-repo-name    # as named in Azure Repos
+  - repo: TODO-repo-name    # the repo name your CI and freshness hook use
     paths:                  # globs relative to the repo root; ** crosses folders
       - TODO/path/**
   # - confluence:
