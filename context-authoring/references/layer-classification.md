@@ -14,7 +14,7 @@ Ask the questions in order; the first yes decides.
 
 Notes:
 
-- `AGENTS.md` holds only what the agent cannot infer from the code and docs it can already read: vocabulary, conventions, contract rules, non-obvious commands. No overviews, no restating the README. A study of context files found generated ones slightly reduced success and raised cost by over 20%, while short human-written ones helped; so you propose candidate lines and people write the file.
+- `AGENTS.md` holds only what the agent cannot infer from the code and docs it can already read: vocabulary, conventions, contract rules, non-obvious commands. No overviews, no restating the README. A study of context files found generated ones slightly reduced success and raised cost by over 20%, while short human-written ones helped; so you propose candidate lines and people write the file. Drafts, when the user asks for them, go to the run folder and are evaluated before merging.
 - Workspace instructions cost tokens on every response. Propose a line there only if a wrong answer would be harmful or the rule applies across repos.
 - `AGENTS.md` loads only when a file in that folder is open. Tasks that start outside the repo (monitoring questions, data lookups asked in the SQL editor) must carry the vocabulary they need inside the skill.
 - A long table of values that a skill needs only sometimes goes in that skill's `references/`.
