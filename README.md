@@ -162,7 +162,7 @@ See [`skills/dp-create-silver-table/`](skills/dp-create-silver-table/) and [`exa
 - **People decide conflicts.** The meta-skill lists them and stops.
 - **People write `AGENTS.md`.** A study found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped. The meta-skill proposes candidate lines with evidence.
 - **Prove value.** Every skill is evaluated with and without itself; a skill the model doesn't need is dropped.
-- **Reuse, don't repeat.** A workflow names existing skills at the step that needs them; a building block exists only if people ask for that task on its own.
+- **Reuse conventions first.** Material shared by several tasks is usually a convention, so it goes to `AGENTS.md`. A skill names another skill only if that one is a task people ask for on their own; short shared steps stay inline. No skill exists only to be reused.
 - **One shared task, one skill.** When teams differ, the skill gets a variant per team instead of competing duplicates.
 - **Keep human edits.** Update mode changes only what its sources changed.
 

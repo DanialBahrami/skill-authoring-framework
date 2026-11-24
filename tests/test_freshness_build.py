@@ -93,6 +93,10 @@ def test_changed_skills(repo: Path):
     md.write_text(md.read_text() + "\n")
     git("-c", "user.email=a@b.c", "-c", "user.name=t", "commit", "-am", "edit")
     assert changed_skills(repo, "main", ["dp-prepare-pr", "dp-other-thing"]) == ["dp-prepare-pr"]
+    # a workflow that uses the changed skill is re-evaluated too, also through a second level
+    uses = {"dp-onboard-source": ["dp-prepare-pr"], "dp-big-flow": ["dp-onboard-source"], "dp-other-thing": []}
+    assert changed_skills(repo, "main", ["dp-prepare-pr", "dp-other-thing", "dp-onboard-source", "dp-big-flow"],
+                          uses) == ["dp-big-flow", "dp-onboard-source", "dp-prepare-pr"]
     (repo / "context" / "workspace-instructions.md").write_text("# changed\n")
     git("-c", "user.email=a@b.c", "-c", "user.name=t", "commit", "-am", "ctx")
     assert changed_skills(repo, "main", ["dp-prepare-pr", "dp-other-thing"]) == ["dp-other-thing", "dp-prepare-pr"]

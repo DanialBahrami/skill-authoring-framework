@@ -75,7 +75,7 @@ Required sections, in this order: `## Steps` (numbered, imperative) and `## Veri
 - Link reference files from `SKILL.md`. Reference files do not link to further files.
 - One term per concept throughout.
 - No `TODO` markers in an active skill.
-- Using another skill: name it at the step that needs it and list it in `uses`; never copy its steps. A building block exists only if people also ask for that task on its own. Depth at most two (workflow, block, block), no cycles, and platform skills never use team skills.
+- Shared material, in this order: a rule, convention or vocabulary goes to `AGENTS.md`; a task people also ask for on its own is its own skill, which others name at the step that needs it and list in `uses` (never copying its steps); anything else stays inline. No skill exists only to be reused. Depth at most two, no cycles, and platform skills never use team skills. When a skill changes, every skill that uses it is re-evaluated.
 
 ## 5. Evals
 
