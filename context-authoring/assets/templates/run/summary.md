@@ -2,6 +2,8 @@
 
 Paste into the pull request description.
 
+Coverage: <complete / partial: which folders were not read closely; see coverage.md>
+
 ## Skills
 
 | Skill | Status | Eval verdict | Routing | Answers with / without | Uses |
@@ -14,6 +16,28 @@ Paste into the pull request description.
 | AGENTS.md candidate lines | agents-md-candidates.md | Repo / folder owner |
 | Workspace instruction changes | workspace-instructions.diff.md | Platform team |
 | Unity Catalog comments | uc-comments.sql | Data owners |
+
+## Genie Code check
+
+`genie-check.md` in the run folder. Checked: <skills> · Not yet checked: <skills>
+
+## Proposed additions to standard.yaml
+
+Environment-specific names found in the code that skills must never contain (catalogs, storage accounts, hosts, paths). For the context repo's `forbidden_patterns`; never for a shared or public copy of the framework.
+
+| Name | Regex | Example from the code (source) |
+| --- | --- | --- |
+
+## Docs to fix
+
+From coverage.md: pages that are empty, outdated or contradict the code.
+
+| Page | Problem | Owner |
+| --- | --- | --- |
+
+## Backlog
+
+Tasks found but not generated: see `backlog.md`.
 
 ## Open conflicts
 

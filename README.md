@@ -133,25 +133,28 @@ It reads the skill, its recorded sources and only the diff, then edits the fewes
 | # | Phase | What happens | Writes |
 | --- | --- | --- | --- |
 | 1 | Scope | Source repo, folders, team and prefix, docs | Run folder |
-| 2 | Load what exists | Existing skills, instructions, `AGENTS.md` files | — |
-| 3 | Analyze | Tasks people repeat, helpers and signatures, vocabularies (term, values, default, consequence), config, guardrails, folders and owners, with a source for every fact; code wins over docs | `inventory.md` |
+| 2 | Load what exists | Existing skills (in the repo and installed in the workspace), instructions, `AGENTS.md` files, earlier skill work, earlier runs' backlog and decisions | — |
+| 3 | Analyze | Coverage first (what is read, how closely, production vs ad hoc); then tasks people repeat, helpers and signatures, vocabularies (term, values, default, consequence), config, guardrails, folders and owners, with a source for every fact; code wins over docs | `coverage.md`, `inventory.md` |
 | 4 | Classify | Each item to exactly one layer, or dropped as public knowledge | `classification.md` |
 | 5 | Find conflicts | Team vs team, docs vs code, new vs existing; **stops for decisions** | `conflicts.md` |
 | 6 | Map | One skill per task; team differences as variants; reuse existing skills by name; catalog budget | — |
 | 7 | Generate | Draft skills; proposals for other owners | `skills/…`, `agents-md-candidates.md`, `workspace-instructions.diff.md`, `uc-comments.sql` |
-| 8 | Validate | Lint; check every name against the code; evals with and without each skill; drop skills with no effect | Eval report |
-| 9 | Hand over | Summary for the pull request | `summary.md` |
+| 8 | Validate | Lint; check every name against the code; evals with and without each skill; drop skills with no effect; checklist for Genie Code | Eval report, `genie-check.md` |
+| 9 | Hand over | Summary for the pull request; tasks not yet generated | `summary.md`, `backlog.md` |
 
 ## 7. What you get
 
 ```
 authoring/runs/2026-11-24-silver/
+├── coverage.md                   what was read and how closely; docs read and their quality
 ├── inventory.md                  every fact, with its source
 ├── classification.md             which layer each fact went to, and why
 ├── conflicts.md                  disagreements and the decisions made
 ├── agents-md-candidates.md       lines for people to write AGENTS.md from
 ├── workspace-instructions.diff.md
 ├── uc-comments.sql
+├── genie-check.md                prompts to try in Genie Code and what to look for
+├── backlog.md                    tasks found but not generated; the next run starts here
 └── summary.md                    paste into the PR
 
 skills/dp-create-silver-table/
@@ -216,8 +219,8 @@ context-authoring/
 │   ├── validation.md                        manual lint checklist, evals, the Genie Code check, symptoms and fixes
 │   └── update-mode.md                       updating one skill
 └── assets/templates/
-    ├── run/                                 inventory, classification, conflicts, AGENTS.md candidates,
-    │                                        workspace-instruction and UC-comment proposals, summary
+    ├── run/                                 coverage, inventory, classification, conflicts, AGENTS.md candidates,
+    │                                        workspace-instruction and UC-comment proposals, backlog, summary
     ├── skill/                               SKILL.md, skill.yaml, evals/evals.json
     ├── AGENTS.repo.md                       root AGENTS.md template
     └── AGENTS.team.md                       team-folder AGENTS.md template

@@ -48,7 +48,7 @@ skills/<name>/
 ├── references/     runtime, optional: detail loaded on demand
 ├── assets/         runtime, optional: templates the agent copies
 ├── scripts/        runtime, optional: code the agent runs
-├── skill.yaml      repo only: owner, status, review date, sources, uses, requires, variants
+├── skill.yaml      repo only: owner, status, review date, sources, uses, requires, supersedes, variants
 └── evals/
     └── evals.json  repo only: test cases (Agent Skills layout)
 ```
@@ -81,17 +81,20 @@ Required sections, in this order: `## Steps` (numbered, imperative) and `## Veri
 
 Each skill carries `evals/evals.json` with at least two `trigger` cases and one `near_miss` case; more are expected for active skills (the Agent Skills guide suggests about 20 trigger queries, half near misses). Trigger cases state observable results with `must_include`, `must_not_include` and `assertions`; cases list the `AGENTS.md` files Genie Code would have loaded.
 
-`skillkit eval` runs, for every case and `--runs` times: a routing test (the model sees the whole catalog plus decoys for built-in skills and picks a skill; passes on a trigger rate of 0.5), and for trigger cases an answer test with the skill and without it (passes on a majority of runs). Skills in `uses` are available in both arms, so a workflow is measured against its building blocks. The report shows the extra tokens per answer the skill costs. The verdict per skill:
+`skillkit eval` runs, for every case and `--runs` times: a routing test (the model sees every skill in the repo that is not deprecated, drafts included, optionally the skills installed in the workspace, plus decoys for built-in skills, and picks a skill; passes on a trigger rate of 0.5; only the skills named are scored), and for trigger cases an answer test with the skill and without it (passes on a majority of runs). Skills in `uses` are available in both arms, so a workflow is measured against its building blocks. The report shows the extra tokens per answer the skill costs. The verdict per skill:
 
 - **ADDS VALUE**: every case passes, and at least one passes only with the skill. Required to merge.
 - **NO EFFECT**: the model already gets it right. Do not merge; move any single useful rule to `AGENTS.md`.
 - **FAILING**: a routing or answer case fails.
+- **INCONCLUSIVE**: answers were cut off at the token limit; raise `eval: max_tokens` in `skill.yaml` and run again.
 
-The PR pipeline runs this for changed skills (3 runs) and, for coexistence, the routing test for every active skill, and posts the report on the PR. During the pilot the eval gate is advisory; it becomes blocking once the suite is stable. Before activating a new skill, the author also runs two cases in a real Genie Code Agent-mode chat and notes the outcome in the PR.
+Every expected behaviour in a case must be achievable without running anything: the model describes what it would do.
+
+The PR pipeline runs this for changed skills (3 runs) and, for coexistence, the routing test for every active skill, and posts the report on the PR. During the pilot the eval gate is advisory; it becomes blocking once the suite is stable. Before activating a new skill, the author also runs two cases in a real Genie Code Agent-mode chat (`skillkit genie-checklist`) and notes the outcome in the PR.
 
 ## 6. Ownership and freshness
 
-`skill.yaml` is the registry record. It holds `owner` (the team registered for the prefix), `status` (`draft`: linted, not deployed; `active`: deployed; `deprecated`: not deployed, kept until removed), `last_reviewed`, `sources` (repo globs, Confluence page id + version, other doc pages by URL, or a note), `uses` (skills it names), `requires` (MCP servers, packages, services) and optional `variants`.
+`skill.yaml` is the registry record. It holds `owner` (the team registered for the prefix), `status` (`draft`: linted, not deployed; `active`: deployed; `deprecated`: not deployed, kept until removed), `last_reviewed`, `sources` (repo globs, Confluence page id + version, other doc pages by URL, or a note), `uses` (skills it names), `requires` (MCP servers, packages, services), `supersedes` (repo or installed skills it replaces once active), an optional `eval: max_tokens`, and optional `variants`.
 
 Security: the linter warns on scripts, network calls, external URLs and paths outside the skill; any such warning needs a reviewer to check it against the stated purpose. Authors cannot approve their own changes (branch policy).
 

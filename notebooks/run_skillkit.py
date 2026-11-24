@@ -23,9 +23,9 @@ default_root = f"/Workspace/Users/{me}/genie-context"
 
 dbutils.widgets.text("root", default_root, "genie-context folder")
 dbutils.widgets.text("repos_root", f"/Workspace/Users/{me}", "Folder holding source repo checkouts")
-dbutils.widgets.dropdown("command", "lint", ["lint", "catalog", "eval", "new", "freshness", "stale", "reviewed", "build"], "Command")
+dbutils.widgets.dropdown("command", "lint", ["lint", "catalog", "eval", "check-names", "genie-checklist", "new", "freshness", "stale", "reviewed", "build"], "Command")
 dbutils.widgets.text("skills", "", "Skill names (space separated)")
-dbutils.widgets.text("extra", "", "Extra arguments, e.g. --case-filter silver-01 --inspect silver-01")
+dbutils.widgets.text("extra", "", "Extra arguments, e.g. --case-filter silver-01, or --repo <path> for check-names")
 
 root = dbutils.widgets.get("root")
 sys.path.insert(0, root)  # import skillkit straight from the Git folder, no install needed
@@ -37,8 +37,11 @@ command = dbutils.widgets.get("command")
 skills = dbutils.widgets.get("skills").split()
 extra = dbutils.widgets.get("extra").split()
 args = ["--root", root, command, *skills]
+installed = "/Workspace/.assistant/skills"  # what workspace users already have
 if command == "eval":
     args += ["--repos-root", dbutils.widgets.get("repos_root"), "--out", f"{root}/authoring/last-eval-report.md"]
+if command in ("eval", "catalog") and os.path.isdir(installed):
+    args += ["--installed", installed]
 args += extra
 print("skillkit", " ".join(args[2:]))
 exit_code = main(args)

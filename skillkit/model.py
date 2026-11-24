@@ -137,6 +137,17 @@ class Skill:
         return [str(u) for u in (self.meta.get("uses", []) or [])]
 
     @property
+    def supersedes(self) -> list[str]:
+        """Skills this one replaces once active: repo skills or skills already installed in the workspace."""
+        return [str(u) for u in (self.meta.get("supersedes", []) or [])]
+
+    @property
+    def eval_max_tokens(self) -> int | None:
+        """Per-skill answer limit for evals (skill.yaml `eval: {max_tokens: N}`), for tasks that span several files."""
+        value = (self.meta.get("eval") or {}).get("max_tokens")
+        return int(value) if value else None
+
+    @property
     def requires(self) -> list[str]:
         return [str(r) for r in (self.meta.get("requires", []) or [])]
 
@@ -246,3 +257,27 @@ def load_skills(root: Path, names: list[str] | None = None) -> list[Skill]:
 
 def workspace_instructions_path(root: Path) -> Path:
     return root / "context" / "workspace-instructions.md"
+
+
+@dataclass
+class InstalledSkill:
+    """A skill already installed in a workspace skills folder, outside this repo."""
+    name: str
+    description: str
+    path: Path
+
+
+def load_installed(folder: Path, exclude: set[str] | None = None) -> list[InstalledSkill]:
+    """Read name and description of every skill in an installed skills folder, for example
+    /Workspace/.assistant/skills in a notebook, or a local export of it. Skills named in
+    `exclude` (this repo's own, already deployed) are left out."""
+    out: list[InstalledSkill] = []
+    if not folder.is_dir():
+        raise SystemExit(f"installed skills folder not found: {folder}")
+    for skill_md in sorted(folder.glob("*/SKILL.md")):
+        front, _, _ = parse_skill_md(skill_md.read_text(encoding="utf-8"))
+        name = str(front.get("name") or skill_md.parent.name)
+        if exclude and name in exclude:
+            continue
+        out.append(InstalledSkill(name, str(front.get("description", "") or "").strip(), skill_md.parent))
+    return out

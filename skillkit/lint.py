@@ -38,7 +38,8 @@ STOPWORDS = {"the", "a", "an", "and", "or", "to", "of", "in", "for", "on", "with
 SECURITY_PATTERNS = [
     ("network call", re.compile(r"\b(requests\.(get|post|put|delete)|urllib|curl |wget |fetch\()")),
     ("external URL", re.compile(r"https?://")),
-    ("path outside the skill", re.compile(r"(?<!%run )\.\./")),  # %run of repo notebooks is expected
+    # %run of repo notebooks is expected, quoted or not: %run ../x, %run "../x", %run '../x'
+    ("path outside the skill", re.compile(r"(?<!%run )(?<!%run \")(?<!%run ')\.\./")),
 ]
 
 
@@ -207,6 +208,9 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
                 _err(out, "SK014", where, f"sources[{i}] must have repo, confluence, doc or note")
 
         # Variants owned by other teams
+        for name in skill.supersedes:
+            if name == skill.name:
+                _err(out, "SK022", where, "a skill cannot supersede itself")
         for i, var in enumerate(meta.get("variants", []) or []):
             ref = var.get("reference", "")
             if not (skill.path / ref).is_file():
@@ -302,6 +306,20 @@ def lint_catalog(skills: list[Skill], std: Standard) -> list[Finding]:
         _err(out, "CT001", "catalog", f"active skill descriptions total about {total} tokens; budget {budget}. Merge or retire a skill")
     elif total > 0.8 * budget:
         _warn(out, "CT001", "catalog", f"active skill descriptions use {total} of {budget} tokens")
+    # Drafts are the planned catalog: warn before they are activated, not after.
+    superseded = {n for s in skills if s.status != "deprecated" for n in s.supersedes}
+    planned = [s for s in skills if s.status in ("active", "draft") and s.name not in superseded]
+    planned_total = sum(estimate_tokens(f"{s.name}: {s.description}") for s in planned)
+    if planned_total > budget and total <= budget:
+        _warn(out, "CT001", "catalog", f"active and draft skill descriptions together total about {planned_total} "
+              f"tokens; budget {budget}. Merge drafts or retire skills before activating them all. "
+              "Skills already installed in the workspace count too: `skillkit catalog --installed <folder>`")
+    by_status = {s.name: s.status for s in skills}
+    for s in skills:
+        for name in s.supersedes:
+            if s.status == "active" and by_status.get(name) == "active":
+                _warn(out, "SK022", f"skills/{s.name}", f"supersedes '{name}', which is still active; deprecate it "
+                      "so the two do not compete for the same prompts")
     names = [s.name for s in skills]
     dupes = {n for n in names if names.count(n) > 1}
     for name in dupes:

@@ -31,15 +31,20 @@ Without it, check by hand and write the result in `summary.md`:
 
 For every helper, template, table, column, widget, parameter and command in the generated files, find it in the source repo (or the doc it came from). Fix or remove anything that is not there. This catches most invented content, and evals do not: a confident wrong name can still pass a rubric.
 
+With `skillkit`: `skillkit check-names <names> --repo <source repo checkout>` looks up every inline code span in the skill and its references, as a file or folder name and in file contents, and lists what it cannot find. Placeholders (`<table>`, `YYYY.MM.DD`) and commands with arguments are skipped. Treat the list as questions, not errors: a value the user types or a workspace group legitimately appears in no file.
+
 ## 3. Evals
 
-`skillkit eval <names> --runs 3` runs each case with and without the skill and reports a verdict per skill:
+`skillkit eval <names> --runs 3` runs each case with and without the skill and reports a verdict per skill. Routing always uses every skill in the repo that is not deprecated, drafts included, so a near miss can go to a sibling skill that is not being evaluated; add `--installed <folder>` to include skills already installed in the workspace.
 
 | Verdict | Meaning | Action |
 | --- | --- | --- |
 | ADDS VALUE | Cases pass more often with the skill | Keep |
 | NO EFFECT | The model answers as well without it | Delete the skill, or move its one useful rule to the `AGENTS.md` candidates |
 | FAILING | Cases fail even with the skill | Fix the skill, or the case if the case was wrong |
+| INCONCLUSIVE | Answers were cut off at the token limit | Set `eval: max_tokens` in the skill's `skill.yaml` and run again |
+
+Before fixing a failing case, check that it is achievable: the eval model cannot run anything, so a case that expects real results (actual table lists, today's branch name) fails for every skill. Rewrite it to expect what the agent would do.
 
 Also read the routing result: a trigger case that does not select the skill, or a near miss that does, means the description needs work. Stop after three rounds and report what still fails.
 
@@ -48,6 +53,8 @@ Without `skillkit`, say in the summary that no evals ran and do step 4 for every
 ## 4. Check in Genie Code
 
 Evals call a model through a serving endpoint; they are not Genie Code itself. Before a skill becomes `active`:
+
+`skillkit genie-checklist <names> --out <run folder>/genie-check.md` writes the prompts to paste and what to look for in each answer, taken from the eval cases.
 
 1. Install the draft as a personal skill (`/Workspace/Users/<you>/.assistant/skills/<name>/`).
 2. In a new Agent-mode thread, open a file in the folder the task belongs to and give two of the skill's trigger prompts, worded as a user would.
