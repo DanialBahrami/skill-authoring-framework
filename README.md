@@ -111,7 +111,7 @@ The meta-skill works in phases and writes every result to a run folder, `authori
 
 ### Deciding conflicts
 
-At step 5 the meta-skill lists every place where sources disagree and **stops**. It never picks a side: a guess is wrong half the time, and writing both sides gives the agent two opposite rules.
+At step 5 the meta-skill lists every place where sources disagree, suggests a decision for each with its reason, and **stops**. It never applies a side itself: a guess is wrong half the time, and writing both sides gives the agent two opposite rules. You can accept its suggestions in one reply ("accept all except 3 and 7"); contract-breaking rows are always decided by number. Skills that depend on no open conflict are generated meanwhile.
 
 | Conflict | Example | Who decides |
 | --- | --- | --- |
@@ -120,7 +120,7 @@ At step 5 the meta-skill lists every place where sources disagree and **stops**.
 | Team vs team | Two teams build Silver tables differently | Platform team and the team: does it break the shared contract? If not, it becomes a variant |
 | New vs existing context | A new skill contradicts a deployed one | Owner of the existing content, with the author |
 
-Each row gets a decision: **Variant**, **Align** (one way wins), **Fix code**, **Fix docs**, or **Open** (nothing that depends on it is generated).
+Each row gets a decision: **Variant**, **Align** (one way wins), **Fix code**, **Fix docs**, or **Open** (nothing that depends on it is generated). `conflicts.md` records who decided, or who accepted the suggestion.
 
 ### Update mode
 
@@ -151,6 +151,7 @@ authoring/runs/2026-11-24-silver/
 ├── classification.md             which layer each fact went to, and why
 ├── conflicts.md                  disagreements and the decisions made
 ├── agents-md-candidates.md       lines for people to write AGENTS.md from
+├── agents-md/                    AGENTS.md drafts, only when asked for; edited by people, evaluated before merging
 ├── workspace-instructions.diff.md
 ├── uc-comments.sql
 ├── genie-check.md                prompts to try in Genie Code and what to look for
@@ -183,7 +184,7 @@ See [`skills/dp-create-silver-table/`](skills/dp-create-silver-table/) and [`exa
 - **Task-shaped skills, no router.** One skill per task people repeat; Genie Code picks skills from their descriptions, so a router skill only adds a hop and duplicates routing.
 - **Distil, don't point.** Skills carry the conventions they need; they never tell the agent to read the repo or wiki at runtime. Runtime lookups are for live state only.
 - **People decide conflicts.** The meta-skill lists them and stops.
-- **People write `AGENTS.md`.** A study found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped. The meta-skill proposes candidate lines with evidence.
+- **People write `AGENTS.md`.** A study found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped. The meta-skill proposes candidate lines with evidence; on request it also writes drafts, which a person edits and which must show value in `skillkit eval-context` before they are merged.
 - **Prove value.** Every skill is evaluated with and without itself; a skill the model doesn't need is dropped.
 - **Reuse conventions first.** Material shared by several tasks is usually a convention, so it goes to `AGENTS.md`. A skill names another skill only if that one is a task people ask for on their own; short shared steps stay inline. No skill exists only to be reused.
 - **One shared task, one skill.** When teams differ, the skill gets a variant per team instead of competing duplicates.

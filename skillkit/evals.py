@@ -20,6 +20,14 @@ Each case can run several times (`runs`). Routing passes on a trigger rate thres
 (default 0.5, as the Agent Skills guide suggests); answers pass on a majority of runs.
 Token usage is recorded when the endpoint reports it, to show what the skill costs.
 
+`AGENTS.md` files a case lists are read from `--agents-drafts` first (drafts in a run
+folder, laid out like the repos root) and otherwise from `--repos-root`.
+
+Results are cached per case in `.skillkit-cache/evals.json`, keyed by everything that
+can change them (prompts, skill text, context, catalog, model, judge, limits, runs), so a
+repeat run re-runs only the cases whose inputs changed; `refresh_failed` also re-runs
+cases that failed or were inconclusive.
+
 An answer cut off at the token limit is not counted as a failure: it is reported as
 truncated, and a case with only truncated failures makes the skill INCONCLUSIVE. Raise
 `eval.max_tokens` in standard.yaml, or per skill in skill.yaml, and run again.
@@ -27,6 +35,7 @@ truncated, and a case with only truncated failures makes the skill INCONCLUSIVE.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -199,22 +208,63 @@ def _arm(llm: LLM, model: str, system: str, case: dict[str, Any], judge_ep: str,
     return ok, notes, answer, _mean(tokens), sum(cuts)
 
 
-def _context_block(root: Path, case: dict[str, Any], repos_root: Path | None) -> tuple[str, list[str]]:
+def _context_block(root: Path, case: dict[str, Any], repos_root: Path | None,
+                   drafts_root: Path | None = None) -> tuple[str, list[str]]:
     warnings = []
     parts = []
     wi = workspace_instructions_path(root)
     if wi.is_file():
         parts.append(f"# Workspace instructions\n{wi.read_text(encoding='utf-8')}")
     for rel in case.get("agents", []) or []:
+        draft = drafts_root / rel if drafts_root else None
+        if draft is not None and draft.is_file():
+            parts.append(f"# {rel}\n{draft.read_text(encoding='utf-8')}")
+            continue
         if repos_root is None:
-            warnings.append(f"case {case.get('id')}: agents file {rel} skipped (no --repos-root)")
+            where = f"--agents-drafts {drafts_root}" if drafts_root else "no --repos-root or --agents-drafts"
+            warnings.append(f"case {case.get('id')}: agents file {rel} skipped ({where})")
             continue
         path = repos_root / rel
         if path.is_file():
             parts.append(f"# {rel}\n{path.read_text(encoding='utf-8')}")
         else:
-            warnings.append(f"case {case.get('id')}: agents file {rel} not found under {repos_root}")
+            warnings.append(f"case {case.get('id')}: agents file {rel} not found under {repos_root}"
+                            + (f" or {drafts_root}" if drafts_root else ""))
     return "\n\n".join(parts), warnings
+
+
+CACHE_FILE = Path(".skillkit-cache") / "evals.json"
+ROUTING_FIELDS = ("routing_expected", "routing_got", "routing_pass", "routing_rate")
+ANSWER_FIELDS = ("with_skill_pass", "with_skill_notes", "with_skill_answer", "with_skill_tokens",
+                 "with_skill_truncated", "baseline_pass", "baseline_notes", "baseline_answer",
+                 "baseline_tokens", "baseline_truncated", "max_tokens")
+
+
+def _key(*parts: Any) -> str:
+    return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def load_cache(root: Path) -> dict[str, Any]:
+    path = root / CACHE_FILE
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_cache(root: Path, cache: dict[str, Any]) -> None:
+    path = root / CACHE_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cache), encoding="utf-8")
+
+
+def _reuse(cache: dict[str, Any] | None, key: str, refresh_failed: bool, passed_field: str) -> dict | None:
+    if cache is None or key not in cache:
+        return None
+    hit = cache[key]
+    if refresh_failed and hit.get(passed_field) is not True:
+        return None
+    return hit
 
 
 def _mean(values: list[int | None]) -> int | None:
@@ -232,7 +282,8 @@ def load_decoys(root: Path) -> list[dict[str, str]]:
 def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[Skill], llm: LLM, *,
               mode: str = "all", baseline: bool = True, repos_root: Path | None = None,
               case_filter: str | None = None, runs: int = 1, threshold: float | None = None,
-              installed: list | None = None, log=print) -> tuple[list[CaseResult], list[SkillVerdict], list[str]]:
+              installed: list | None = None, drafts_root: Path | None = None,
+              cache: dict[str, Any] | None = None, refresh_failed: bool = False, log=print) -> tuple[list[CaseResult], list[SkillVerdict], list[str]]:
     model = std.eval.get("model_endpoint")
     judge_ep = std.eval.get("judge_endpoint", model)
     max_tokens = int(std.eval.get("max_tokens", 2000))
@@ -253,6 +304,7 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
     pattern = re.compile(case_filter) if case_filter else None
 
     results: list[CaseResult] = []
+    reused = 0
     for skill in targets:
         for case in skill.cases:
             if pattern and not pattern.search(str(case.get("id", ""))):
@@ -261,7 +313,13 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
             res = CaseResult(skill=skill.name, case_id=str(case.get("id")), case_type=ctype)
             log(f"  {skill.name} / {res.case_id}")
 
-            if mode in ("all", "routing"):
+            routing_key = _key("routing", model, ROUTER_SYSTEM, catalog_text, skill.name, case, runs, threshold)
+            hit = _reuse(cache, routing_key, refresh_failed, "routing_pass") if mode in ("all", "routing") else None
+            if hit:
+                for name in ROUTING_FIELDS:
+                    setattr(res, name, hit.get(name))
+                reused += 1
+            elif mode in ("all", "routing"):
                 expected = case.get("expect_skill") or (skill.name if ctype == "trigger" else None)
                 picks = []
                 for _ in range(runs):
@@ -282,9 +340,11 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
                     res.routing_expected = f"not {skill.name}"
                     res.routing_rate = picks.count(skill.name) / runs   # false-trigger rate
                     res.routing_pass = res.routing_rate < threshold
+                if cache is not None:
+                    cache[routing_key] = {name: getattr(res, name) for name in ROUTING_FIELDS}
 
             if mode in ("all", "answer") and ctype == "trigger":
-                context, warn = _context_block(root, case, repos_root)
+                context, warn = _context_block(root, case, repos_root, drafts_root)
                 warnings += warn
                 deps = ""
                 for dep in skill.uses:
@@ -296,6 +356,15 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
                 with_skill = f"{base_context}\n\n# Skill loaded: {skill.name}\n{skill.reference_text()}"
                 limit = skill.eval_max_tokens or max_tokens
                 res.max_tokens = limit
+                answer_key = _key("answer", model, judge_ep, AGENT_SYSTEM, JUDGE_SYSTEM, with_skill, base_context,
+                                  case, limit, runs, baseline)
+                hit = _reuse(cache, answer_key, refresh_failed, "with_skill_pass")
+                if hit:
+                    for name in ANSWER_FIELDS:
+                        setattr(res, name, hit.get(name))
+                    reused += 1
+                    results.append(res)
+                    continue
                 (res.with_skill_pass, res.with_skill_notes, res.with_skill_answer, res.with_skill_tokens,
                  res.with_skill_truncated) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + with_skill, case,
                                                   judge_ep, limit, runs)
@@ -303,8 +372,13 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
                     (res.baseline_pass, res.baseline_notes, res.baseline_answer, res.baseline_tokens,
                      res.baseline_truncated) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + base_context, case,
                                                     judge_ep, limit, runs)
+                if cache is not None:
+                    cache[answer_key] = {name: getattr(res, name) for name in ANSWER_FIELDS}
             results.append(res)
 
+    if reused:
+        warnings.append(f"cache: {reused} routing or answer result(s) reused because nothing they depend on "
+                        "changed; use --no-cache for fresh samples")
     verdicts = []
     for skill in targets:
         rows = [r for r in results if r.skill == skill.name]
@@ -383,8 +457,8 @@ def results_json(results: list[CaseResult], verdicts: list[SkillVerdict]) -> str
                       indent=2, default=str)
 
 
-def run_context_evals(root: Path, std: Standard, cases_file: Path, llm: LLM, *, repos_root: Path,
-                      runs: int = 1, log=print) -> tuple[list[CaseResult], SkillVerdict, list[str]]:
+def run_context_evals(root: Path, std: Standard, cases_file: Path, llm: LLM, *, repos_root: Path | None,
+                      runs: int = 1, drafts_root: Path | None = None, log=print) -> tuple[list[CaseResult], SkillVerdict, list[str]]:
     """Evaluate AGENTS.md files the way skills are evaluated: each case runs with the AGENTS.md
     files it lists and without them (workspace instructions in both arms, no skills).
     Research on context files found that generated, redundant ones cost tokens without helping,
@@ -404,7 +478,7 @@ def run_context_evals(root: Path, std: Standard, cases_file: Path, llm: LLM, *, 
         case["rubric"] = list(case.get("assertions", []) or [])
         res = CaseResult(skill=data.get("name", cases_file.stem), case_id=case["id"], case_type="context")
         log(f"  {res.skill} / {res.case_id}")
-        context, warn = _context_block(root, case, repos_root)
+        context, warn = _context_block(root, case, repos_root, drafts_root)
         warnings += warn
         for arm, ctx in (("with", context), ("without", base)):
             ok, notes, answer, tokens, cuts = _arm(llm, model, AGENT_SYSTEM + "\n\n" + ctx, case, judge_ep,
