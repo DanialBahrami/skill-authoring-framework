@@ -40,6 +40,7 @@ def cmd_lint(args) -> int:
     if not args.skills:
         findings += lint.lint_catalog(skills, std)
         findings += lint.lint_workspace_instructions(workspace_instructions_path(root), std)
+        findings += lint.lint_journeys(root, skills)
     return _print_findings(findings)
 
 
@@ -132,7 +133,11 @@ def cmd_genie_checklist(args) -> int:
     skills = load_skills(root, args.skills or None)
     if not args.skills:
         skills = [s for s in skills if s.status != "deprecated"]
-    md = checklist_markdown(skills, args.prompts)
+    from .evals import load_journeys
+
+    names = {s.name for s in skills}
+    journeys = [j for j in load_journeys(root) if set(j["skills"]) & names]
+    md = checklist_markdown(skills, args.prompts, journeys)
     if args.out:
         Path(args.out).write_text(md, encoding="utf-8")
         print(f"wrote {args.out}")
@@ -261,8 +266,29 @@ def cmd_confluence(args) -> int:
     return 1 if changes else 0
 
 
+def _checker(args, std):
+    """The execution gate, when --execute is given: EXPLAIN on a development SQL warehouse."""
+    if not getattr(args, "execute", False):
+        return None
+    import os
+
+    from .execute import SqlChecker, warehouse_runner
+
+    conf = std.eval.get("execution", {}) or {}
+    warehouse = args.warehouse_id or os.environ.get("DATABRICKS_WAREHOUSE_ID") or conf.get("warehouse_id")
+    if not warehouse:
+        raise SystemExit("--execute needs --warehouse-id, DATABRICKS_WAREHOUSE_ID or eval.execution.warehouse_id")
+    variables = {str(k): str(v) for k, v in (conf.get("variables", {}) or {}).items()}
+    for pair in args.sql_var or []:
+        key, _, value = pair.partition("=")
+        variables[key.strip()] = value.strip()
+    signature = json.dumps({"warehouse": warehouse, "variables": variables}, sort_keys=True)
+    return SqlChecker(warehouse_runner(warehouse, profile=args.profile), variables, signature)
+
+
 def cmd_eval(args) -> int:
-    from .evals import ServingLLM, report_markdown, results_json, run_evals
+    from .evals import (ServingLLM, journeys_failing, journeys_markdown, load_journeys, report_markdown,
+                        results_json, run_evals, run_journeys)
 
     root, std = _ctx(args)
     all_skills = load_skills(root)
@@ -281,6 +307,7 @@ def cmd_eval(args) -> int:
 
     installed = load_installed(Path(args.installed), {s.name for s in all_skills}) if args.installed else []
     cache = None if args.no_cache else load_cache(root)
+    checker = _checker(args, std)
     llm = ServingLLM(profile=args.profile)
     print(f"evaluating {len(targets)} skill(s); routing against {len(all_skills)} repo skill(s)"
           + (f" and {len(installed)} installed" if installed else ""))
@@ -289,10 +316,24 @@ def cmd_eval(args) -> int:
         repos_root=Path(args.repos_root) if args.repos_root else None, case_filter=args.case_filter,
         runs=args.runs, threshold=args.threshold, installed=installed,
         drafts_root=Path(args.agents_drafts) if args.agents_drafts else None,
-        cache=cache, refresh_failed=args.refresh_failed)
+        cache=cache, refresh_failed=args.refresh_failed, checker=checker)
+    journeys = [] if args.no_journeys else load_journeys(root)
+    if args.skills:   # journeys that involve a skill under evaluation
+        journeys = [j for j in journeys if set(j["skills"]) & set(args.skills)]
+    journey_results = []
+    if journeys and args.mode == "all":
+        journey_results, jwarn = run_journeys(
+            root, std, all_skills, journeys, llm, repos_root=Path(args.repos_root) if args.repos_root else None,
+            drafts_root=Path(args.agents_drafts) if args.agents_drafts else None, runs=args.runs,
+            threshold=args.threshold, installed=installed, cache=cache, refresh_failed=args.refresh_failed,
+            checker=checker)
+        warnings += jwarn
     if cache is not None:
         save_cache(root, cache)
-    md = report_markdown(results, verdicts, warnings, std)
+    md = report_markdown(results, verdicts, warnings, std) + journeys_markdown(journey_results)
+    if checker is not None:
+        md += "\nExecution gate: SQL in answers was planned with EXPLAIN on the development warehouse; " \
+              "a statement that does not plan fails the run.\n"
     print(md)
     if args.out:
         Path(args.out).write_text(md, encoding="utf-8")
@@ -303,7 +344,7 @@ def cmd_eval(args) -> int:
             if r.case_id == args.inspect:
                 print(f"\n=== {r.skill}/{r.case_id} with skill ===\n{r.with_skill_answer}")
                 print(f"\n=== without skill ===\n{r.baseline_answer}")
-    failing = any(v.verdict == "FAILING" for v in verdicts)
+    failing = any(v.verdict == "FAILING" for v in verdicts) or journeys_failing(journey_results)
     no_effect = any(v.verdict == "NO EFFECT" for v in verdicts)
     return 1 if failing or (no_effect and args.require_value) else 0
 
@@ -320,7 +361,8 @@ def cmd_eval_context(args) -> int:
     llm = ServingLLM(profile=args.profile)
     results, summary, warnings = run_context_evals(
         root, std, Path(args.cases), llm, repos_root=Path(args.repos_root) if args.repos_root else None,
-        runs=args.runs, drafts_root=Path(args.agents_drafts) if args.agents_drafts else None)
+        runs=args.runs, drafts_root=Path(args.agents_drafts) if args.agents_drafts else None,
+        checker=_checker(args, std))
     md = report_markdown(results, [summary], warnings, std).replace("Answers with skill", "With AGENTS.md") \
         .replace("Answers without skill", "Without AGENTS.md")
     print(md)
@@ -357,6 +399,14 @@ def cmd_reviewers(args) -> int:
     print("\nSeparation of duties: require at least one reviewer, turn off 'Allow requestors to approve")
     print("their own changes' and turn on 'Prohibit the most recent pusher from approving their own changes'.")
     return 0
+
+
+def _execution_args(s) -> None:
+    s.add_argument("--execute", action="store_true",
+                   help="execution gate: plan the SQL in each answer with EXPLAIN on a development SQL warehouse")
+    s.add_argument("--warehouse-id", help="SQL warehouse for --execute (or DATABRICKS_WAREHOUSE_ID)")
+    s.add_argument("--sql-var", action="append", metavar="NAME=VALUE",
+                   help="value for ${NAME}, {{NAME}}, {NAME} or :NAME in generated SQL, e.g. catalog=dev_catalog")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -441,6 +491,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--no-cache", action="store_true", help="ignore and do not update .skillkit-cache/")
     s.add_argument("--refresh-failed", action="store_true",
                    help="re-run cases that failed or were inconclusive, even if their inputs did not change")
+    s.add_argument("--no-journeys", action="store_true", help="skip evals/journeys.json")
+    _execution_args(s)
     s.add_argument("--model"), s.add_argument("--judge")
     s.add_argument("--runs", type=int, default=1, help="runs per case; routing uses the trigger rate, answers the majority")
     s.add_argument("--threshold", type=float, help="trigger rate threshold (default from standard.yaml, 0.5)")
@@ -455,6 +507,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--repos-root", help="folder holding source repo checkouts")
     s.add_argument("--agents-drafts", help="AGENTS.md drafts laid out like --repos-root, e.g. <run folder>/agents-md")
     s.add_argument("--runs", type=int, default=1)
+    _execution_args(s)
     s.add_argument("--model"), s.add_argument("--profile"), s.add_argument("--out")
     s.set_defaults(func=cmd_eval_context)
 

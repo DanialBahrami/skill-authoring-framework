@@ -1,0 +1,13 @@
+{
+  "journeys": [
+    {
+      "id": "TODO-onboard-to-pr",
+      "prompt": "TODO: a task as a user would ask it, which needs several skills, e.g. 'Onboard the CRM contracts feed to Silver and open the PR'",
+      "skills": ["TODO-first-skill-it-starts-with", "TODO-skill-named-in-its-steps", "TODO-next-skill"],
+      "agents": ["TODO-repo/AGENTS.md"],
+      "must_include": ["TODO: a name from the second or later skill, which only appears if the hand-over worked"],
+      "must_not_include": ["TODO: a hardcoded environment value"],
+      "assertions": ["TODO: the table or parameter one skill produces is the one the next skill uses"]
+    }
+  ]
+}

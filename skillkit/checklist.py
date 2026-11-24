@@ -6,6 +6,7 @@ the manual check in a real Agent-mode thread quick enough that it gets done.
 
 from __future__ import annotations
 
+
 from .model import Skill
 
 
@@ -16,7 +17,10 @@ def _look_for(case: dict) -> list[str]:
     return items
 
 
-def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2) -> str:
+READ_FILES = "- [ ] Read repo files to answer? no / yes: ____ (if yes, did the skill or the repo do the work?)"
+
+
+def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2, journeys: list[dict] | None = None) -> str:
     lines = [
         "# Genie Code check",
         "",
@@ -42,6 +46,20 @@ def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2) -> str:
             lines += [f"**{case['id']}**" + (f" (open a file under `{agents[0].rsplit('/', 1)[0]}/`)" if agents else ""),
                       "", "```text", case["prompt"], "```", ""]
             lines += [f"- [ ] {item}" for item in _look_for(case)] or ["- [ ] The answer does the task as the skill describes"]
-            lines.append("")
+            lines += [READ_FILES, ""]
+        if triggers:
+            lines += ["**No file open**: if this task can start outside the repo (SQL editor, a new notebook), ask "
+                      f"**{triggers[0]['id']}** once more with no repo file open. `AGENTS.md` does not load then, so the "
+                      "skill must carry what it needs.", "",
+                      "- [ ] Same result without a repo file open, or the task never starts outside the repo", ""]
         lines += ["Result: [ ] passes  [ ] needs work: ____________________", ""]
+    if journeys:
+        lines += ["## Journeys", "",
+                  "Tasks that span several skills. This is the only check of whether Genie Code loads a skill named "
+                  "in another skill's steps: the simulated evals load them all up front.", ""]
+        for j in journeys:
+            lines += [f"**{j['id']}**", "", "```text", j["prompt"], "```", ""]
+            lines += [f"- [ ] Used `{name}`" + (" first" if k == 0 else "") for k, name in enumerate(j["skills"])]
+            lines += [f"- [ ] {item}" for item in _look_for(j)]
+            lines += [READ_FILES, "- [ ] Result: passes / needs work: ____", ""]
     return "\n".join(lines)

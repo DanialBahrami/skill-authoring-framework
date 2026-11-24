@@ -17,6 +17,9 @@ variables:
   # blocking: a FAILING or NO EFFECT verdict fails the PR.
   - name: EVAL_GATE
     value: advisory
+  # Optional: EVAL_WAREHOUSE_ID (in the variable group) = a development SQL warehouse; turns on the
+  # execution gate (EXPLAIN on generated SQL). The service principal must only read the development
+  # catalog; set the variable values (e.g. catalog) in standard.yaml under eval.execution.variables.
 
 pool:
   vmImage: ubuntu-latest
@@ -54,7 +57,7 @@ steps:
   - script: |
       skillkit eval $(CHANGED_SKILLS) \
         --repos-root $(Pipeline.Workspace)/s/repos \
-        --runs 3 --require-value \
+        --runs 3 --require-value ${EVAL_WAREHOUSE_ID:+--execute --warehouse-id $EVAL_WAREHOUSE_ID} \
         --out $(Build.ArtifactStagingDirectory)/eval-report.md \
         --json $(Build.ArtifactStagingDirectory)/eval-results.json \
       || { if [ "$(EVAL_GATE)" = "blocking" ]; then exit 1; else echo "##vso[task.logissue type=warning]Evals failed (advisory mode)"; fi; }

@@ -4,6 +4,9 @@
 # principal with CAN QUERY on the eval endpoints); SOURCE_REPO_TOKEN (read access to private
 # source repos, for AGENTS.md context in evals).
 # Variable: EVAL_GATE = advisory (failures are warnings, for a pilot) or blocking.
+# Variable (optional): EVAL_WAREHOUSE_ID = a development SQL warehouse; turns on the execution gate
+# (EXPLAIN on generated SQL). The service principal must only be able to read the development catalog;
+# set the variable values (e.g. catalog) in standard.yaml under eval.execution.variables.
 
 name: pr-validation
 
@@ -62,10 +65,12 @@ jobs:
           DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
           DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
           EVAL_GATE: ${{ vars.EVAL_GATE || 'advisory' }}
+          EVAL_WAREHOUSE_ID: ${{ vars.EVAL_WAREHOUSE_ID }}
         run: |
           status=0
           skillkit eval ${{ steps.changed.outputs.skills }} --repos-root ../repos/$(dirname "$SOURCE_REPO") \
-            --runs 3 --require-value --out eval-report.md --json eval-results.json || status=1
+            --runs 3 --require-value ${EVAL_WAREHOUSE_ID:+--execute --warehouse-id $EVAL_WAREHOUSE_ID} \
+            --out eval-report.md --json eval-results.json || status=1
           skillkit eval --mode routing --runs 3 --out routing-all.md || status=1
           cat routing-all.md >> eval-report.md
           if [ "$status" = 1 ]; then
