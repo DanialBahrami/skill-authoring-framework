@@ -27,7 +27,7 @@ skills/<prefix>-<verb>-<object>/
 - `## Verify`: the checks the agent runs before reporting back, as queries or commands.
 - Optional `## Gotchas` (facts that defy reasonable assumptions; often the highest-value content), `## Rules`, `## Examples`, `## References`. No other sections: no "Before you start", decision trees, troubleshooting catalogues or related-skill lists. A decision is a step with its condition. Troubleshooting worth keeping is a reference file.
 - Frontmatter may also use the specification's optional fields (`license`, `compatibility`, `metadata`); owner and source commit are stamped into `metadata` at build time.
-- Using another skill: name it at the step ("Ingest to Bronze: follow the `dp-configure-autoloader` skill with ...") and list it in `uses`. Never copy its steps.
+- Using another skill: name it at the step ("Ingest to Bronze: follow the `dp-configure-autoloader` skill with ...") and list it in `uses`. Never copy its steps. Only name skills that are tasks people also ask for on their own; a shared rule belongs in `AGENTS.md`, a short shared step stays inline.
 - Variants: when another team does the task differently, step 1 states the condition and links `references/<team>.md`; declare it in `skill.yaml` under `variants`.
 - No dates, version notes or history.
 

@@ -81,16 +81,32 @@ def mark_reviewed(skill: Skill, today: dt.date | None = None) -> None:
     path.write_text(new, encoding="utf-8")
 
 
-def changed_skills(root: Path, base: str, all_names: list[str]) -> list[str]:
-    """Skill names touched between `base` and HEAD. A change to shared context
-    (workspace instructions, standard.yaml) affects every skill."""
+def dependents(names: set[str], uses: dict[str, list[str]]) -> set[str]:
+    """Skills that use any of `names`, directly or through another skill."""
+    found: set[str] = set()
+    frontier = set(names)
+    while frontier:
+        nxt = {skill for skill, deps in uses.items() if frontier & set(deps)} - found - names
+        found |= nxt
+        frontier = nxt
+    return found
+
+
+def changed_skills(root: Path, base: str, all_names: list[str],
+                   uses: dict[str, list[str]] | None = None) -> list[str]:
+    """Skill names touched between `base` and HEAD, plus every skill that uses one of them
+    (a changed building block can break the workflows that reference it). A change to shared
+    context (workspace instructions, standard.yaml) affects every skill."""
     result = subprocess.run(["git", "diff", "--name-only", f"{base}...HEAD"], cwd=root,
                             capture_output=True, text=True, check=True)
     paths = [p for p in result.stdout.splitlines() if p]
     if any(p.startswith("context/") or p == "standard.yaml" for p in paths):
         return sorted(all_names)
     names = {p.split("/")[1] for p in paths if p.startswith("skills/") and p.count("/") >= 2}
-    return sorted(n for n in names if n in all_names)
+    names = {n for n in names if n in all_names}
+    if uses:
+        names |= {d for d in dependents(names, uses) if d in all_names}
+    return sorted(names)
 
 
 # --- Confluence -----------------------------------------------------------------

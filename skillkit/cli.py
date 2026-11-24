@@ -143,8 +143,10 @@ def cmd_freshness(args) -> int:
 
 def cmd_changed(args) -> int:
     root, _ = _ctx(args)
-    names = [s.name for s in load_skills(root) if s.status != "deprecated"]
-    print(" ".join(freshness.changed_skills(root, args.base, names)))
+    skills = [s for s in load_skills(root) if s.status != "deprecated"]
+    names = [s.name for s in skills]
+    uses = {s.name: s.uses for s in skills}
+    print(" ".join(freshness.changed_skills(root, args.base, names, uses)))
     return 0
 
 
@@ -297,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--fail-on-match", action="store_true")
     s.set_defaults(func=cmd_freshness)
 
-    s = sub.add_parser("changed", help="skills touched since a git base (for PR evals)")
+    s = sub.add_parser("changed", help="skills touched since a git base, plus skills that use them (for PR evals)")
     s.add_argument("--base", default="origin/main")
     s.set_defaults(func=cmd_changed)
 

@@ -107,12 +107,17 @@ The judge is a second model from a different family (set in `standard.yaml`). Th
 
 ## 5. Skills that use other skills
 
-Skills come in two kinds:
+Reuse is kept deliberately small. Most material shared between tasks is a convention, not a step, so it belongs in `AGENTS.md`, which loads once. The meta-skill decides shared material in this order:
 
-- **Building blocks** — one focused task (`dp-configure-autoloader`, `dp-prepare-pr`). Only created when people also ask for that task on its own; otherwise the steps stay in the workflow, because many narrow skills loaded for one task add overhead and conflicting instructions.
-- **Workflows** — an end-to-end journey that names building blocks at the step where they're needed ("Ingest to Bronze: follow the `dp-configure-autoloader` skill with …") and holds only the glue.
+1. A rule, convention or vocabulary goes to `AGENTS.md` (or workspace instructions if it must hold outside the repo).
+2. A task people also ask for on its own is its own skill. Other skills name it at the step that needs it ("Ingest to Bronze: follow the `dp-configure-autoloader` skill with …") and list it in `uses`, without copying its steps.
+3. Anything else stays inside each skill that needs it. A few repeated lines cost less than a skill that must always load alongside.
 
-Rules (checked by the linter): every skill named in the body is listed in `uses` and vice versa; used skills exist and are active; no cycles; depth ≤ 2; platform skills never use team skills. Evals run a workflow with its building blocks present, so the baseline measures the workflow's own value.
+No skill exists only to be reused.
+
+**Checks.** The linter requires every skill named in a body to be listed in `uses` and vice versa; used skills must exist and be active; no cycles; depth at most 2; platform skills never use team skills. Evals run a skill with the skills it uses present, so the baseline measures its own value. When a skill changes, `skillkit changed` also returns every skill that uses it, directly or through another skill, so the PR pipeline re-evaluates them.
+
+**Test it in your pilot.** Genie Code does not document whether it loads a skill because another skill names it. Build one workflow two ways, referencing the skills it uses and self-contained, and compare them with `skillkit eval`: did Genie load the referenced skills, which version passes more cases, and which costs fewer tokens. If referencing loses, keep workflows self-contained and treat `uses` as documentation.
 
 ## 6. Deployment
 
