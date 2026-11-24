@@ -3,6 +3,7 @@
 ## Contents
 
 - How to work this step
+- Coverage first
 - Signals in the code
 - Signals in the docs
 - Signals in the history
@@ -17,6 +18,15 @@ Read for the inventory, not for completeness. Spread the signals below over a fe
 
 Read code before docs. Where they disagree, record both in `conflicts.md`; the code is the current state, but people decide which side is right.
 
+## Coverage first
+
+In a large repo you will not read everything, and that is fine as long as it is visible. Before the inventory, fill `coverage.md`:
+
+1. List the folders in scope with their file counts (`find <folder> -type f | wc -l`, or the file browser).
+2. Sort each into a kind: **production** (deployed code and shared helpers: referenced from bundles, jobs or CI), **team-owned** (a team's production folder), **ad hoc** (personal or exploratory scripts, many similar one-off files, no job references them), **archive** (`old`, `archive`, `deprecated`, untouched for a long time).
+3. Read production and team-owned folders first. Take conventions, helpers and examples only from them; ad hoc code shows what people actually struggle with (gotchas), not how it should be done. Skip archives unless a doc points there.
+4. Record how closely you read each folder. A folder you only skimmed is "sampled" or "names only", and its tasks go to `backlog.md`, not into skills.
+
 ## Signals in the code
 
 | Look at | Gives you | Goes to inventory table |
@@ -24,7 +34,7 @@ Read code before docs. Where they disagree, record both in `conflicts.md`; the c
 | Shared libraries, helper modules, `%run` targets, imported utility notebooks | The helpers people are meant to call, with signatures and what they guarantee (deduplication, audit columns, tagging) | Shared helpers and templates |
 | Setup notebooks, scaffolds, cookiecutters, `assets/` or `templates/` folders | The starting point for a repeated task, and its required parameters | Tasks; Shared helpers and templates |
 | Bundle files (`databricks.yml`, `resources/`), job and pipeline definitions | Environments, how values are injected (variables, widgets), schedules, compute choices | Config, metadata and environments |
-| Config files, settings objects, widget definitions | How catalogs, schemas, paths and secrets are derived per environment; the values skills must never hardcode | Config, metadata and environments |
+| Config files, settings objects, widget definitions | How catalogs, schemas, paths and secrets are derived per environment; the values skills must never hardcode. Note every environment-specific name pattern (catalogs, storage accounts, hosts, paths) for the forbidden patterns proposed in `summary.md` | Config, metadata and environments |
 | Enums, constants, validation code, `CHECK` constraints, `assert`s | Allowed values and the combinations the code rejects | Vocabulary |
 | Columns or tags the code adds automatically (audit timestamps, source file, run id, delete flag, `pii` tags) | Technical columns users must not redefine | Vocabulary |
 | Tests, especially end-to-end ones, and example notebooks | Real, working sequences of a task; real examples to copy instead of inventing | Tasks (sub-steps) |
@@ -42,6 +52,8 @@ Read code before docs. Where they disagree, record both in `conflicts.md`; the c
 | Decision records, standards pages | Rules with their reasons; the reason becomes the one line of reasoning in a skill |
 | Troubleshooting pages, incident write-ups, FAQ | Gotchas and failure fixes |
 | Pages that describe something the code no longer does | A docs-vs-code conflict, not a fact |
+
+Record every page you read in the "Docs read" table of `coverage.md`: useful or not (empty, only meeting links, outdated) and whether it contradicts the code. That list tells page owners what to fix first.
 
 Skip meeting notes, history of decisions and anything that restates public Databricks documentation.
 
@@ -91,6 +103,8 @@ For each vocabulary the code has, record term, allowed values, default and the c
 Separate tasks of the people who work in the repo (build a table, fix a job) from tasks of whoever maintains the shared tooling itself (release the helper library, change the CI pipeline). Generate skills for the first group by default; the second group gets skills only when the user asks, owned by the tooling's maintainers.
 
 ## When the inventory is done
+
+- Every folder in scope is in `coverage.md` with how closely it was read; what was not read closely is in `backlog.md`.
 
 - Every task in scope has its sub-steps, who does it, and whether people ask for each sub-step on its own.
 - Every helper a task uses has its signature.

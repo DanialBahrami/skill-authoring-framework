@@ -10,7 +10,7 @@ skills/<prefix>-<verb>-<object>/
 ├── references/     optional, detail opened on demand; each file linked from SKILL.md
 ├── assets/         optional, templates the agent copies (notebook skeletons, YAML)
 ├── scripts/        optional, code the agent runs
-├── skill.yaml      owner, status: draft, last_reviewed: today, sources, uses, requires, variants
+├── skill.yaml      owner, status: draft, last_reviewed: today, sources, uses, requires, supersedes, variants
 └── evals/
     └── evals.json  Agent Skills eval layout; at least 2 trigger cases, 1 near_miss
 ```
@@ -52,5 +52,7 @@ skills/<prefix>-<verb>-<object>/
 - Trigger prompts as a developer would type them, in different words from the description, with real context (table names, paths). Include at least one that needs the skill without naming its domain.
 - `must_include` for names that must appear (helpers, templates, conventions); `must_not_include` for hardcoded environment values and the wrong approach (for example a hand-written MERGE where a template exists).
 - `assertions` for observable behaviour (asks for consent, verifies uniqueness, does not read PII rows). Drop assertions that pass with and without the skill; they show nothing.
+- Every expected behaviour must be achievable without running anything: the eval model cannot run code, query data or know today's date. Expect what it would do ("gives the query that lists the downstream tables", "names the branch `Development-Release-<date>`"), never results ("lists the downstream tables", "uses the actual branch name").
+- When good answers span several files and get cut off, set `eval: max_tokens` in `skill.yaml` instead of shortening the case.
 - At least one near miss that shares vocabulary but belongs to another skill or to none; set `expect_skill` when the right skill is known.
 - `agents:` lists the `AGENTS.md` files Genie Code would have loaded for that prompt.

@@ -25,6 +25,14 @@ uses: []
 # MCP servers, packages or services the skill depends on (registry "dependencies").
 requires: []
 
+# Skills this one replaces once it is active: repo skills or skills already installed in the
+# workspace. They leave the planned catalog budget; deprecate or uninstall them on activation.
+supersedes: []
+
+# Optional: a higher answer limit for evals when answers span several files (default in standard.yaml).
+# eval:
+#   max_tokens: 4000
+
 # Optional: parts of this skill owned by another team (multi-team repos).
 # variants:
 #   - reference: references/<team>.md
