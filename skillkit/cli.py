@@ -79,7 +79,7 @@ def cmd_new(args) -> int:
     if target.exists():
         print(f"{target} already exists", file=sys.stderr)
         return 1
-    shutil.copytree(root / "templates" / "skill", target)
+    shutil.copytree(root / "context-authoring" / "assets" / "templates" / "skill", target)
     for path in target.rglob("*"):
         if path.is_file():
             text = path.read_text(encoding="utf-8")
@@ -274,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("catalog", help="list skills and token budgets")
     s.set_defaults(func=cmd_catalog)
 
-    s = sub.add_parser("new", help="scaffold a skill from templates/skill")
+    s = sub.add_parser("new", help="scaffold a draft skill from the generator's skill template")
     s.add_argument("name")
     s.set_defaults(func=cmd_new)
 

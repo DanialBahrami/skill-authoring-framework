@@ -1,12 +1,12 @@
 # Output contract for generated skills
 
-The linter (`skillkit lint`) enforces most of this; the rest is checked in review.
+These are the defaults. A `standard.yaml` in the context repo overrides the limits, prefixes and sections. `skillkit lint` enforces most of this; the rest is checked in review, or by hand when `skillkit` is not available.
 
 ## Folder
 
 ```
 skills/<prefix>-<verb>-<object>/
-├── SKILL.md        frontmatter (name, description only) + body
+├── SKILL.md        frontmatter (name, description; optional license, compatibility, metadata) + body
 ├── references/     optional, detail opened on demand; each file linked from SKILL.md
 ├── assets/         optional, templates the agent copies (notebook skeletons, YAML)
 ├── scripts/        optional, code the agent runs
