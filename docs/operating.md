@@ -24,7 +24,7 @@ Done once by the platform team. Step 7 must happen before the first deploy, beca
 
 1. **Create the context repo from this framework and replace the examples.** Everything organisation-specific is an example:
     - `standard.yaml`: `teams` (with their `codeowners` or `reviewers` groups), `prefixes`, the environment catalog regex in `forbidden_patterns` (the example uses `lakehouse_dev|stg|prd`), and the eval endpoints available in your workspace.
-    - `context/workspace-instructions.md`: your environments and hard rules.
+    - `context/workspace-instructions.md`: copy in your workspace's current instructions (`/Workspace/.assistant_workspace_instructions.md`), or leave it empty if there are none, and remove the `<!-- EXAMPLE` marker. Evals inject this file into every answer, so until the marker is gone they refuse to run (the example's catalog names would leak into every verdict) and `build` refuses to deploy it (it would replace your real instructions).
     - `skills/dp-create-silver-table/` and `examples/data-platform/`: fictional; delete them or keep them for reference until your first skills exist.
     - `evals/decoys.yaml`: the built-in skills present in your workspace.
 2. **Create a service principal** and add it to every target workspace. Give it an OAuth secret (Databricks OAuth machine-to-machine works on AWS, Azure and GCP). Only admins can create items at the workspace root, so an admin first creates `/Workspace/.assistant/` and an empty `/Workspace/.assistant_workspace_instructions.md`. Grant the service principal `CAN MANAGE` on both, and `CAN QUERY` on the eval endpoints. For the optional execution gate, also `CAN USE` on a development SQL warehouse and only `USE CATALOG`, `USE SCHEMA` and `SELECT` on the development catalog: the gate sends only `EXPLAIN`, and read-only access means a mistake still cannot change data.
@@ -98,7 +98,13 @@ The judge is a second model from a different family (set in `standard.yaml`). Th
 | **FAILING** | A routing or answer case fails | Inspect with `--inspect <case-id>`; fix the skill, its description or the case |
 | **INCONCLUSIVE** | Answers were cut off at the token limit (reported per case as "cut off") | Set `eval: max_tokens` in the skill's `skill.yaml` (default `eval.max_tokens` in `standard.yaml`) and run again |
 
-**Execution gate (optional).** Rubrics see whether code looks right; the gate checks whether its SQL plans. With `--execute --warehouse-id <dev warehouse>` (or `EVAL_WAREHOUSE_ID` in the pipelines), every ```sql block and `spark.sql(...)` call in an answer is planned with `EXPLAIN` on that warehouse. Variables the skills use (`${catalog}`, `{{catalog}}`, `{catalog}`, `:catalog`) are filled from `eval.execution.variables` in `standard.yaml` or `--sql-var name=value`. A statement that does not plan (unknown table, column or function, syntax error) fails the run; missing permissions and unbound parameters are reported as inconclusive. DDL, grants, statements with placeholders and statements on tables the answer itself creates are not checked, and PySpark DataFrame code is not checked either.
+**Execution gate (optional).** Rubrics see whether code looks right; the gate checks it against the development workspace without running it. With `--execute --warehouse-id <dev warehouse>` (or `EVAL_WAREHOUSE_ID` in the pipelines; in a notebook without a warehouse, the active Spark session):
+
+- every query and DML statement in an answer (```sql blocks and `spark.sql(...)` calls) is planned with `EXPLAIN`, including the query part of `CREATE ... AS SELECT` and temp views;
+- every fully qualified table in a development catalog gets `DESCRIBE TABLE`, including `MERGE`, `INSERT` and `ALTER` targets. The catalogs are `eval.execution.catalogs` in `standard.yaml`, or by default the values of the SQL variables, so `alias.struct.field` is never mistaken for a table;
+- Python blocks are compiled (syntax only) and YAML blocks parsed, locally.
+
+Only `EXPLAIN` and `DESCRIBE TABLE` are ever sent; both read metadata, never rows. Variables the skills use (`${catalog}`, `{{catalog}}`, `{catalog}`, `:catalog`) are filled from `eval.execution.variables` or `--sql-var name=value`. A statement that does not plan, a table that does not exist, or a syntax error fails the run. Missing permissions, unbound parameters and unqualified names that may be temp views defined elsewhere are inconclusive. Tables the answer creates, or that match the case's `exec_new_tables` regexes (a source not onboarded yet), are skipped. DDL, grants and statements with placeholders are not checked, and PySpark DataFrame code is checked for syntax only.
 
 **Journeys.** `evals/journeys.json` holds tasks that span several skills (template: `context-authoring/assets/templates/journeys.json`). `skillkit eval` runs every journey that involves a skill under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. A failing journey fails the eval. Because the simulation loads all skills up front, it shows whether skills hand over, not whether Genie Code loads a skill named in another skill's steps; the journeys section of `skillkit genie-checklist` covers that in a real chat.
 
@@ -169,7 +175,7 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 | `check-names [skills] --repo R [--repo R2] [--strict]` | Names in skills and their references (inline code) that are not found in the source repos, as file names or in contents |
 | `genie-checklist [skills] [--prompts N] [--out F]` | Prompts to paste in Genie Code and what to look for, per skill and per journey, with a no-file-open prompt and a "read repo files?" check |
 | `new <name>` | Scaffolds a draft skill; owner from the prefix |
-| `eval [skills]` | Routing and answer tests with baseline. `--mode all\|routing\|answer`, `--runs N`, `--threshold`, `--no-baseline`, `--require-value`, `--case-filter`, `--inspect ID`, `--repos-root`, `--agents-drafts DIR`, `--installed DIR`, `--no-cache`, `--refresh-failed`, `--no-journeys`, `--execute`, `--warehouse-id`, `--sql-var NAME=VALUE`, `--model`, `--judge`, `--out`, `--json` |
+| `eval [skills]` | Routing and answer tests with baseline. `--mode all\|routing\|answer`, `--runs N`, `--threshold`, `--no-baseline`, `--require-value`, `--case-filter`, `--inspect ID`, `--repos-root`, `--agents-drafts DIR`, `--installed DIR`, `--no-cache`, `--refresh-failed`, `--no-journeys`, `--execute`, `--warehouse-id`, `--sql-var NAME=VALUE`, `--allow-example-instructions`, `--model`, `--judge`, `--out`, `--json` |
 | `eval-context --cases F [--repos-root D] [--agents-drafts D] [--execute …]` | Evaluates `AGENTS.md` files with and without them; drafts in `--agents-drafts` are used where present |
 | `build [--out]` | Lints, then bundles active skills and instructions with checksums |
 | `deploy [--build] [--dry-run] [--no-prune] [--profile]` | Verifies checksums, uploads skills, instructions and manifest |
@@ -195,6 +201,8 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 | SK022 | `supersedes`: not itself; the superseded repo skill is deprecated once this one is active |
 | CT001–CT004 | Catalog budget (error for active skills, warning when active and drafts together exceed it); duplicate names; description overlap; dependency cycles, depth and direction |
 | JR001 | `evals/journeys.json`: unique ids, a prompt, at least two known skills that are not deprecated |
+| JR002 | Every skill in a journey is reachable from its first skill through `uses` (warning) |
+| WI004 | Workspace instructions are still the framework's example (warning; evals and build refuse) |
 | WI001–WI003 | Workspace instructions size, token budget, no emails or tokens |
 | AG001–AG002 | `AGENTS.md` size, no emails or tokens |
 

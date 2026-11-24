@@ -26,7 +26,8 @@ Without it, check by hand and write the result in `summary.md`:
 - [ ] `skill.yaml` has owner, status `draft`, `last_reviewed`, and at least one source; every variant has an owner.
 - [ ] `evals/evals.json` has at least two trigger cases and one near miss.
 - [ ] Every decision from the inventory's vocabulary that the task touches (load type, delete handling, data quality severity, breaking or not before anything destructive) appears in the skill as a step with its default and the condition for the alternative.
-- [ ] Every skill that uses others has a journey in `evals/journeys.json`.
+- [ ] Every skill that uses others has a journey in `evals/journeys.json`, and every skill in a journey is reachable from its first skill through `uses` (JR002).
+- [ ] `context/workspace-instructions.md` holds the workspace's real instructions, not the framework example: evals inject it into every answer.
 - [ ] All new descriptions together fit the catalog budget alongside the existing ones.
 
 ## 2. Names against the code
@@ -46,7 +47,7 @@ With `skillkit`: `skillkit check-names <names> --repo <source repo checkout>` lo
 | FAILING | Cases fail even with the skill | Fix the skill, or the case if the case was wrong |
 | INCONCLUSIVE | Answers were cut off at the token limit | Set `eval: max_tokens` in the skill's `skill.yaml` and run again |
 
-**Execution gate.** Rubrics and regexes see whether code looks right, not whether it runs. With a development SQL warehouse, add `--execute --warehouse-id <id>` (and `--sql-var catalog=<dev catalog>` for the variables the skills use): the SQL in every answer, in ```sql blocks and `spark.sql(...)` calls, is planned with `EXPLAIN`, and a statement that does not plan (unknown table, column or function, syntax error) fails the run. Only `EXPLAIN` is sent, only queries and DML are planned, and DDL, grants and statements on tables the answer itself creates are reported as not checked. PySpark DataFrame code is not checked. Use an identity that can only read the development catalog.
+**Execution gate.** Rubrics and regexes see whether code looks right, not whether it runs. Add `--execute` with a development SQL warehouse (`--warehouse-id <id>`), or run it from a notebook to use the active Spark session, and `--sql-var catalog=<dev catalog>` for the variables the skills use. The gate plans every query and DML statement in an answer with `EXPLAIN`, runs `DESCRIBE TABLE` on every fully qualified table in the development catalog (`MERGE` and `ALTER` targets too), compiles Python blocks and parses YAML blocks. An invented table or column, or a syntax error, fails the case even when the rubric passed. Only `EXPLAIN` and `DESCRIBE TABLE` are sent, and both read metadata, never rows. Tables the answer creates are skipped; for a source that is not onboarded yet, list its tables as regexes in the case's `exec_new_tables`. Use an identity that can only read the development catalog.
 
 **Journeys.** `evals/journeys.json` holds tasks that span several skills. `skillkit eval` runs the journeys that involve the skills under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. This shows whether the skills hand over (names, tables and parameters line up). It cannot show whether Genie Code loads a skill named in another skill's steps; the journeys in the Genie Code check do.
 
@@ -77,6 +78,7 @@ Record the result in `summary.md`. A skill that uses other skills always gets th
 | --- | --- | --- |
 | Agent invents a helper, field or value | It was not inlined | Inline the signature or vocabulary (term, values, default, consequence) |
 | Execution gate: column or table not found | The skill names a column or table that is not in the development catalog, or the model invented one | Check the skill's names with `check-names` and against the table; inline the real column list where the task needs it |
+| Answers use catalog or table names that exist nowhere in your code | The evals injected example workspace instructions, or an example `AGENTS.md` | Replace `context/workspace-instructions.md` with the real one; check the case's `agents` paths |
 | Journey fails but each skill passes alone | The skills do not hand over: different names for the same table or parameter | Use the same names in both skills; state in the using skill what it passes |
 | Skill not used for a prompt it should handle | Description lacks the words people type | Rewrite the description with the prompt's words; add the prompt as a trigger case |
 | Skill used for the wrong task | Two descriptions overlap | Sharpen both; add a near-miss case naming the right skill |

@@ -235,7 +235,7 @@ Adopt it in stages; each stage is useful on its own.
 | Stage | Who | What | Result |
 | --- | --- | --- | --- |
 | 1. Try it | One person | Install the meta-skill, run create mode on one folder of one repo, decide the conflicts, check two prompts in Genie Code with the drafts installed as personal skills | A few draft skills, and a list of the conventions and conflicts in that area |
-| 2. Set up the context repo | Platform team | Create a repo from this framework; adapt `standard.yaml` (teams, prefixes, forbidden patterns), the workspace instructions and the example content; install `skillkit`; lint and run evals locally; write the source repo's `AGENTS.md` from the candidate lines | Reviewed skills that measurably help, in version control |
+| 2. Set up the context repo | Platform team | Create a repo from this framework; adapt `standard.yaml` (teams, prefixes, forbidden patterns), copy in your real workspace instructions (evals refuse to run on the example) and replace the example content; install `skillkit`; lint and run evals locally; write the source repo's `AGENTS.md` from the candidate lines | Reviewed skills that measurably help, in version control |
 | 3. Automate | Platform team | Add the CI pipelines (GitHub Actions or Azure DevOps): PR validation with eval reports, deployment to dev then prod; lock the workspace skills folder so only the pipeline writes it | Every change reviewed and evaluated; one writer per workspace |
 | 4. Keep it current and grow | Owning teams | Add the freshness hook to source repos and the weekly maintenance run; onboard more teams with their prefix, reviewers and team `AGENTS.md` | Skills that follow the code; more teams under one standard |
 
@@ -284,6 +284,6 @@ skill-authoring-framework/
 
 - **Undocumented Genie Code behaviour.** Precedence between nested `AGENTS.md` files and workspace instructions, which Genie Code modes read `AGENTS.md`, and whether a skill named in another skill's steps gets loaded are not documented. Test them before relying on them.
 - **Evals are a simulation** through model serving endpoints, not the Genie Code agent itself. Check each new skill with two prompts in a real Agent-mode chat (`skillkit genie-checklist`).
-- **The execution gate checks SQL only**, by planning it with `EXPLAIN`; PySpark DataFrame code, DDL and statements on tables the answer creates are not checked. It has been tested with a simulated warehouse, not a real one yet.
+- **The execution gate checks metadata, not results.** It plans SQL with `EXPLAIN`, describes tables and checks Python and YAML syntax; it cannot see whether a query returns the right rows, and PySpark DataFrame code is checked for syntax only. It is tested with a simulated warehouse and Spark session; its first live run (in a fork) found real invented table names.
 - **Deploy and the CI pipelines are tested with mocks only**; the GitHub Actions and Azure DevOps workflows have not run against a real workspace yet. Start in a dev workspace with `--dry-run`.
 - **The example skill is fictional** and contains `TODO` markers.

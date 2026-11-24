@@ -97,3 +97,4 @@ eval:
   #   warehouse_id: ""         # or --warehouse-id / DATABRICKS_WAREHOUSE_ID
   #   variables:               # values for ${name}, {{name}}, {name} and :name in generated SQL
   #     catalog: my_dev_catalog
+  #   catalogs: [my_dev_catalog]   # tables in these catalogs get DESCRIBE TABLE (default: the variable values)

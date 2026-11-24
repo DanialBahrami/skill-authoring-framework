@@ -11,8 +11,8 @@ from pathlib import Path
 
 from . import build as build_mod
 from . import freshness, lint
-from .model import (estimate_tokens, find_repo_root, load_installed, load_skills, load_standard,
-                    workspace_instructions_path)
+from .model import (EXAMPLE_INSTRUCTIONS_HELP, estimate_tokens, find_repo_root, is_example_instructions,
+                    load_installed, load_skills, load_standard, workspace_instructions_path)
 
 
 def _ctx(args):
@@ -178,6 +178,10 @@ def cmd_build(args) -> int:
         _print_findings(findings)
         print("build refused: fix lint errors first", file=sys.stderr)
         return 1
+    if is_example_instructions(root):
+        print(f"build refused: {EXAMPLE_INSTRUCTIONS_HELP} Deploying it would replace the workspace's real "
+              "instructions with the example.", file=sys.stderr)
+        return 1
     manifest = build_mod.build(root, skills, Path(args.out))
     print(json.dumps(manifest, indent=2))
     return 0
@@ -266,24 +270,33 @@ def cmd_confluence(args) -> int:
     return 1 if changes else 0
 
 
+def _refuse_example_instructions(root, args) -> None:
+    if is_example_instructions(root) and not getattr(args, "allow_example_instructions", False):
+        raise SystemExit(f"{EXAMPLE_INSTRUCTIONS_HELP}\nEvals inject this file into every answer, so their verdicts "
+                         "would reflect the example. Use --allow-example-instructions only to try the framework itself.")
+
+
 def _checker(args, std):
     """The execution gate, when --execute is given: EXPLAIN on a development SQL warehouse."""
     if not getattr(args, "execute", False):
         return None
     import os
 
-    from .execute import SqlChecker, warehouse_runner
+    from .execute import SqlChecker, spark_runner, warehouse_runner
 
     conf = std.eval.get("execution", {}) or {}
     warehouse = args.warehouse_id or os.environ.get("DATABRICKS_WAREHOUSE_ID") or conf.get("warehouse_id")
-    if not warehouse:
-        raise SystemExit("--execute needs --warehouse-id, DATABRICKS_WAREHOUSE_ID or eval.execution.warehouse_id")
     variables = {str(k): str(v) for k, v in (conf.get("variables", {}) or {}).items()}
     for pair in args.sql_var or []:
         key, _, value = pair.partition("=")
         variables[key.strip()] = value.strip()
-    signature = json.dumps({"warehouse": warehouse, "variables": variables}, sort_keys=True)
-    return SqlChecker(warehouse_runner(warehouse, profile=args.profile), variables, signature)
+    catalogs = conf.get("catalogs")
+    runner = warehouse_runner(warehouse, profile=args.profile) if warehouse else spark_runner()
+    signature = json.dumps({"warehouse": warehouse or "spark", "variables": variables, "catalogs": catalogs},
+                           sort_keys=True)
+    print(f"execution gate on ({'warehouse ' + warehouse if warehouse else 'Spark session'}): "
+          "EXPLAIN and DESCRIBE TABLE only")
+    return SqlChecker(runner, variables, signature, catalogs)
 
 
 def cmd_eval(args) -> int:
@@ -291,6 +304,7 @@ def cmd_eval(args) -> int:
                         results_json, run_evals, run_journeys)
 
     root, std = _ctx(args)
+    _refuse_example_instructions(root, args)
     all_skills = load_skills(root)
     if args.skills:
         targets = [s for s in all_skills if s.name in set(args.skills)]
@@ -358,6 +372,7 @@ def cmd_eval_context(args) -> int:
     if not args.repos_root and not args.agents_drafts:
         print("give --repos-root, --agents-drafts or both", file=sys.stderr)
         return 2
+    _refuse_example_instructions(root, args)
     llm = ServingLLM(profile=args.profile)
     results, summary, warnings = run_context_evals(
         root, std, Path(args.cases), llm, repos_root=Path(args.repos_root) if args.repos_root else None,
@@ -402,9 +417,12 @@ def cmd_reviewers(args) -> int:
 
 
 def _execution_args(s) -> None:
+    s.add_argument("--allow-example-instructions", action="store_true",
+                   help="run although context/workspace-instructions.md is still the framework's example")
     s.add_argument("--execute", action="store_true",
                    help="execution gate: plan the SQL in each answer with EXPLAIN on a development SQL warehouse")
-    s.add_argument("--warehouse-id", help="SQL warehouse for --execute (or DATABRICKS_WAREHOUSE_ID)")
+    s.add_argument("--warehouse-id", help="SQL warehouse for --execute (or DATABRICKS_WAREHOUSE_ID); "
+                   "without one, the active Spark session is used (in a notebook)")
     s.add_argument("--sql-var", action="append", metavar="NAME=VALUE",
                    help="value for ${NAME}, {{NAME}}, {NAME} or :NAME in generated SQL, e.g. catalog=dev_catalog")
 

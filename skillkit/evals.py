@@ -206,7 +206,7 @@ def _arm(llm: LLM, model: str, system: str, case: dict[str, Any], judge_ep: str,
         cuts.append(_truncated(llm))
         ok, notes = score_answer(answer, case, llm, judge_ep, max(max_tokens, 1000))
         if checker is not None:
-            report = checker.check(answer)
+            report = checker.check(answer, case.get("exec_new_tables"))
             sql = report.summary()
             if report.invalid:
                 ok, notes = False, notes + report.notes()

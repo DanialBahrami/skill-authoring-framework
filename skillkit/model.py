@@ -259,6 +259,23 @@ def workspace_instructions_path(root: Path) -> Path:
     return root / "context" / "workspace-instructions.md"
 
 
+EXAMPLE_MARKER = "<!-- EXAMPLE"
+
+
+def is_example_instructions(root: Path) -> bool:
+    """True while context/workspace-instructions.md is still the framework's example. Evals inject
+    this file into every answer, so example values (catalog names, rules) would leak into them, and
+    deploying it would replace the workspace's real instructions."""
+    path = workspace_instructions_path(root)
+    return path.is_file() and EXAMPLE_MARKER in path.read_text(encoding="utf-8")
+
+
+EXAMPLE_INSTRUCTIONS_HELP = (
+    "context/workspace-instructions.md is still the framework's example (it contains '<!-- EXAMPLE'). "
+    "Copy your workspace's real instructions (/Workspace/.assistant_workspace_instructions.md) into it, "
+    "or leave it empty if the workspace has none, and remove the marker.")
+
+
 @dataclass
 class InstalledSkill:
     """A skill already installed in a workspace skills folder, outside this repo."""
