@@ -25,6 +25,7 @@ dbutils.widgets.text("root", default_root, "genie-context folder")
 dbutils.widgets.text("repos_root", f"/Workspace/Users/{me}", "Folder holding source repo checkouts")
 dbutils.widgets.dropdown("command", "lint", ["lint", "catalog", "eval", "check-names", "genie-checklist", "new", "freshness", "stale", "reviewed", "build"], "Command")
 dbutils.widgets.text("skills", "", "Skill names (space separated)")
+dbutils.widgets.text("warehouse_id", "", "Dev SQL warehouse for the execution gate (optional)")
 dbutils.widgets.text("extra", "", "Extra arguments, e.g. --case-filter silver-01, or --repo <path> for check-names")
 
 root = dbutils.widgets.get("root")
@@ -40,6 +41,9 @@ args = ["--root", root, command, *skills]
 installed = "/Workspace/.assistant/skills"  # what workspace users already have
 if command == "eval":
     args += ["--repos-root", dbutils.widgets.get("repos_root"), "--out", f"{root}/authoring/last-eval-report.md"]
+if command == "eval" and dbutils.widgets.get("warehouse_id"):
+    # EXPLAIN runs as you: use a warehouse and catalog where you only need read access
+    args += ["--execute", "--warehouse-id", dbutils.widgets.get("warehouse_id")]
 if command in ("eval", "catalog") and os.path.isdir(installed):
     args += ["--installed", installed]
 args += extra

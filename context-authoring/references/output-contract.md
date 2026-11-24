@@ -56,3 +56,7 @@ skills/<prefix>-<verb>-<object>/
 - When good answers span several files and get cut off, set `eval: max_tokens` in `skill.yaml` instead of shortening the case.
 - At least one near miss that shares vocabulary but belongs to another skill or to none; set `expect_skill` when the right skill is known.
 - `agents:` lists the `AGENTS.md` files Genie Code would have loaded for that prompt.
+
+## evals/journeys.json (context repo)
+
+A skill that uses other skills gets a journey: `id`, `prompt` (a task that needs the chain), `skills` (where it starts first, then the skills it hands over to), and the same `agents`, `must_include`, `must_not_include` and `assertions` as a case. Check what only passes when the hand-over worked: a name from a later skill, the table one step creates being the one the next step uses.

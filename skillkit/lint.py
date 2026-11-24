@@ -395,3 +395,39 @@ def lint_agents_md(path: Path, std: Standard) -> list[Finding]:
         if match:
             _err(out, "AG002", where, f"contains {label}: '{match.group(0)}'")
     return out
+
+
+def lint_journeys(root, skills: list[Skill]) -> list[Finding]:
+    """evals/journeys.json: unique ids, a prompt, at least two known, non-deprecated skills."""
+    import json
+
+    out: list[Finding] = []
+    path = root / "evals" / "journeys.json"
+    if not path.is_file():
+        return out
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        _err(out, "JR001", "evals/journeys.json", f"not valid JSON: {exc}")
+        return out
+    status = {s.name: s.status for s in skills}
+    seen: set[str] = set()
+    for i, j in enumerate(data.get("journeys", []) or []):
+        where = f"evals/journeys.json[{j.get('id', i)}]"
+        jid = str(j.get("id", ""))
+        if not jid or jid in seen:
+            _err(out, "JR001", where, "every journey needs a unique id")
+        seen.add(jid)
+        if not str(j.get("prompt", "")).strip():
+            _err(out, "JR001", where, "prompt is missing")
+        names = [str(n) for n in (j.get("skills") or [])]
+        if len(names) < 2:
+            _err(out, "JR001", where, "a journey lists at least two skills, the first one being where it starts")
+        for name in names:
+            if name not in status:
+                _err(out, "JR001", where, f"unknown skill '{name}'")
+            elif status[name] == "deprecated":
+                _err(out, "JR001", where, f"skill '{name}' is deprecated")
+        if not (j.get("must_include") or j.get("assertions")):
+            _warn(out, "JR001", where, "no must_include or assertions: the journey can only fail on routing")
+    return out

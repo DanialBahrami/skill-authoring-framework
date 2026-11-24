@@ -69,6 +69,7 @@ Tasks people repeat show up as repeated changes. When the repo history is availa
 
 A checklist, not a quota: keep only tasks people in scope actually repeat, and name them in the team's words.
 
+- Explore a source before building on it (list and profile files, probe an API, sample tables)
 - Bring in a new source (file, database, API, stream)
 - Create or change a table, view or model in a layer
 - Add or change a column or schema; backfill or reprocess data
@@ -76,6 +77,7 @@ A checklist, not a quota: keep only tasks people in scope actually repeat, and n
 - Schedule, change or rerun a job or pipeline
 - Promote a change between environments; prepare a release or PR
 - Diagnose a failed run or a slow job
+- Monitor pipelines, data quality or cost; set up or answer alerts
 - Grant access; tag or mask sensitive data; handle a deletion request
 - Train, register, promote or monitor a model
 - Build or publish a dashboard, report or app
@@ -101,6 +103,8 @@ For each vocabulary the code has, record term, allowed values, default and the c
 ## Who the tasks are for
 
 Separate tasks of the people who work in the repo (build a table, fix a job) from tasks of whoever maintains the shared tooling itself (release the helper library, change the CI pipeline). Generate skills for the first group by default; the second group gets skills only when the user asks, owned by the tooling's maintainers.
+
+Tasks that chain (onboard a source, then change its schema, then prepare the PR) are journeys: note them, they become the cross-skill eval cases.
 
 ## When the inventory is done
 

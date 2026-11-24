@@ -27,7 +27,7 @@ Done once by the platform team. Step 7 must happen before the first deploy, beca
     - `context/workspace-instructions.md`: your environments and hard rules.
     - `skills/dp-create-silver-table/` and `examples/data-platform/`: fictional; delete them or keep them for reference until your first skills exist.
     - `evals/decoys.yaml`: the built-in skills present in your workspace.
-2. **Create a service principal** and add it to every target workspace. Give it an OAuth secret (Databricks OAuth machine-to-machine works on AWS, Azure and GCP). Only admins can create items at the workspace root, so an admin first creates `/Workspace/.assistant/` and an empty `/Workspace/.assistant_workspace_instructions.md`. Grant the service principal `CAN MANAGE` on both, and `CAN QUERY` on the eval endpoints.
+2. **Create a service principal** and add it to every target workspace. Give it an OAuth secret (Databricks OAuth machine-to-machine works on AWS, Azure and GCP). Only admins can create items at the workspace root, so an admin first creates `/Workspace/.assistant/` and an empty `/Workspace/.assistant_workspace_instructions.md`. Grant the service principal `CAN MANAGE` on both, and `CAN QUERY` on the eval endpoints. For the optional execution gate, also `CAN USE` on a development SQL warehouse and only `USE CATALOG`, `USE SCHEMA` and `SELECT` on the development catalog: the gate sends only `EXPLAIN`, and read-only access means a mistake still cannot change data.
 3. **Lock the skills folder**: all users `CAN READ` on `/Workspace/.assistant/skills/` (Genie Code reads skills as the user); no other write grants.
 4. **Store the secrets in your CI**, per workspace: `DATABRICKS_HOST`, `DATABRICKS_CLIENT_ID`, `DATABRICKS_CLIENT_SECRET`. If skills cite Confluence pages: `CONFLUENCE_BASE_URL`, `CONFLUENCE_TOKEN`, and `CONFLUENCE_EMAIL` for Confluence Cloud. If source repos are private: a read token for them.
     - GitHub Actions: environments `genie-context-dev` and `genie-context-prod` with these secrets, and required reviewers on prod.
@@ -45,13 +45,13 @@ Done once by the platform team. Step 7 must happen before the first deploy, beca
 The meta-skill (see the [README](../README.md)) drafts context; this is the review process around it in the `genie-context` repo.
 
 1. Branch the context repo and run the meta-skill in create or update mode.
-2. Decide the conflicts it lists (README, "Deciding conflicts").
+2. Decide the conflicts it lists (README, "Deciding conflicts"): accept its suggestions in one reply or decide row by row; contract-breaking rows always by number.
 3. Review every generated file as the owner: replace `TODO`s, narrow the `sources` globs to the files the skill really depends on.
 4. Run `skillkit lint`, `skillkit check-names <names> --repo <source checkout>` and `skillkit eval <names> --runs 3 --repos-root <folder with source checkouts>`.
 5. Check two prompts per skill in a real Genie Code Agent-mode chat with the skill installed in your user folder; `skillkit genie-checklist <names>` writes the prompts and what to look for.
 6. Set `status: active` for skills with an ADDS VALUE verdict; others can merge as `draft`.
 7. Open the PR with `summary.md`; the pipeline posts lint results and the eval report; the owning team and the platform team review with the checklist in `docs/STANDARD.md`. The author cannot approve.
-8. Send the proposals to their owners: a person writes `AGENTS.md` from the candidate lines and checks it with `skillkit eval-context`; instruction changes go to the platform team; Unity Catalog comments to data owners.
+8. Send the proposals to their owners: a person writes `AGENTS.md` from the candidate lines (or edits the drafts in `<run folder>/agents-md/`, if they were asked for) and checks it with `skillkit eval-context`, using `--agents-drafts <run folder>/agents-md` to test drafts before they are merged; instruction changes go to the platform team; Unity Catalog comments to data owners.
 
 A hand-written skill starts with `skillkit new <name>` and continues from step 3.
 
@@ -98,11 +98,17 @@ The judge is a second model from a different family (set in `standard.yaml`). Th
 | **FAILING** | A routing or answer case fails | Inspect with `--inspect <case-id>`; fix the skill, its description or the case |
 | **INCONCLUSIVE** | Answers were cut off at the token limit (reported per case as "cut off") | Set `eval: max_tokens` in the skill's `skill.yaml` (default `eval.max_tokens` in `standard.yaml`) and run again |
 
+**Execution gate (optional).** Rubrics see whether code looks right; the gate checks whether its SQL plans. With `--execute --warehouse-id <dev warehouse>` (or `EVAL_WAREHOUSE_ID` in the pipelines), every ```sql block and `spark.sql(...)` call in an answer is planned with `EXPLAIN` on that warehouse. Variables the skills use (`${catalog}`, `{{catalog}}`, `{catalog}`, `:catalog`) are filled from `eval.execution.variables` in `standard.yaml` or `--sql-var name=value`. A statement that does not plan (unknown table, column or function, syntax error) fails the run; missing permissions and unbound parameters are reported as inconclusive. DDL, grants, statements with placeholders and statements on tables the answer itself creates are not checked, and PySpark DataFrame code is not checked either.
+
+**Journeys.** `evals/journeys.json` holds tasks that span several skills (template: `context-authoring/assets/templates/journeys.json`). `skillkit eval` runs every journey that involves a skill under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. A failing journey fails the eval. Because the simulation loads all skills up front, it shows whether skills hand over, not whether Genie Code loads a skill named in another skill's steps; the journeys section of `skillkit genie-checklist` covers that in a real chat.
+
+**Repeat runs.** Results are cached per case in `.skillkit-cache/` (git-ignored), keyed by everything that can change them: prompts, skill text, context, catalog, model, judge, limits and runs. A repeat run with `--runs 3` therefore re-runs only the cases whose inputs changed. `--refresh-failed` also re-runs failed and inconclusive cases; `--no-cache` ignores the cache.
+
 **Advisory or blocking.** During a pilot, run the PR gate in advisory mode (`EVAL_GATE=advisory`): failures show as warnings and reviewers decide. Switch to `blocking` once your eval cases are stable; then a FAILING or NO EFFECT verdict fails the PR.
 
 **Coexistence**: when any skill changes, the PR pipeline reruns routing for **every** active skill, so a new description cannot steal prompts from existing ones. The linter also warns when two descriptions overlap.
 
-**`AGENTS.md` is evaluated too**: `skillkit eval-context --cases examples/data-platform/agents-evals.json --repos-root ~/repos` runs the same prompts with and without the `AGENTS.md` files. Research found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped — so people write `AGENTS.md`, and it has to show it helps.
+**`AGENTS.md` is evaluated too**: `skillkit eval-context --cases examples/data-platform/agents-evals.json --repos-root ~/repos` runs the same prompts with and without the `AGENTS.md` files. Add `--agents-drafts <run folder>/agents-md` to evaluate drafts before they reach the source repo. Research found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped — so people write `AGENTS.md`, and it has to show it helps.
 
 ## 4. Multi-team repositories
 
@@ -161,10 +167,10 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 | `lint-agents <files>` | Checks `AGENTS.md` files (size, no emails or tokens) |
 | `catalog [--installed DIR]` | Skills, status, owner, description tokens; active and planned (active + drafts, minus superseded) budget; with `--installed`, skills already in the workspace, their share of the budget and overlap with repo skills |
 | `check-names [skills] --repo R [--repo R2] [--strict]` | Names in skills and their references (inline code) that are not found in the source repos, as file names or in contents |
-| `genie-checklist [skills] [--prompts N] [--out F]` | Prompts to paste in Genie Code and what to look for, per skill, from its eval cases |
+| `genie-checklist [skills] [--prompts N] [--out F]` | Prompts to paste in Genie Code and what to look for, per skill and per journey, with a no-file-open prompt and a "read repo files?" check |
 | `new <name>` | Scaffolds a draft skill; owner from the prefix |
-| `eval [skills]` | Routing and answer tests with baseline. `--mode all\|routing\|answer`, `--runs N`, `--threshold`, `--no-baseline`, `--require-value`, `--case-filter`, `--inspect ID`, `--repos-root`, `--installed DIR`, `--model`, `--judge`, `--out`, `--json` |
-| `eval-context --cases F --repos-root D` | Evaluates `AGENTS.md` files with and without them |
+| `eval [skills]` | Routing and answer tests with baseline. `--mode all\|routing\|answer`, `--runs N`, `--threshold`, `--no-baseline`, `--require-value`, `--case-filter`, `--inspect ID`, `--repos-root`, `--agents-drafts DIR`, `--installed DIR`, `--no-cache`, `--refresh-failed`, `--no-journeys`, `--execute`, `--warehouse-id`, `--sql-var NAME=VALUE`, `--model`, `--judge`, `--out`, `--json` |
+| `eval-context --cases F [--repos-root D] [--agents-drafts D] [--execute …]` | Evaluates `AGENTS.md` files with and without them; drafts in `--agents-drafts` are used where present |
 | `build [--out]` | Lints, then bundles active skills and instructions with checksums |
 | `deploy [--build] [--dry-run] [--no-prune] [--profile]` | Verifies checksums, uploads skills, instructions and manifest |
 | `freshness --repo R --changed … \| --changed-file F` | Skills whose sources match changed files (`--format text\|markdown\|json`) |
@@ -188,6 +194,7 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 | SK021 | `uses` matches the skills named in the body; dependencies exist and are active |
 | SK022 | `supersedes`: not itself; the superseded repo skill is deprecated once this one is active |
 | CT001–CT004 | Catalog budget (error for active skills, warning when active and drafts together exceed it); duplicate names; description overlap; dependency cycles, depth and direction |
+| JR001 | `evals/journeys.json`: unique ids, a prompt, at least two known skills that are not deprecated |
 | WI001–WI003 | Workspace instructions size, token budget, no emails or tokens |
 | AG001–AG002 | `AGENTS.md` size, no emails or tokens |
 

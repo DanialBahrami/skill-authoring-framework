@@ -91,3 +91,9 @@ eval:
   judge_endpoint: databricks-gpt-oss-120b
   max_tokens: 2000
   trigger_threshold: 0.5     # routing passes when the trigger rate over --runs reaches this
+  # Execution gate (skillkit eval --execute): SQL in answers is planned with EXPLAIN on a development
+  # SQL warehouse. Run it as an identity that can only read the development catalog.
+  # execution:
+  #   warehouse_id: ""         # or --warehouse-id / DATABRICKS_WAREHOUSE_ID
+  #   variables:               # values for ${name}, {{name}}, {name} and :name in generated SQL
+  #     catalog: my_dev_catalog
