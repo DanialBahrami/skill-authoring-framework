@@ -1,0 +1,52 @@
+# Deploys active skills and workspace instructions after a merge to main.
+# Each stage targets one workspace; production waits for the approval set on the
+# `genie-context-prod` environment (Pipelines > Environments > Approvals and checks).
+
+trigger:
+  branches:
+    include: [main]
+  paths:
+    include: [skills, context, standard.yaml]
+
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: build
+    jobs:
+      - job: build
+        steps:
+          - task: UsePythonVersion@0
+            inputs: { versionSpec: "3.11" }
+          - script: pip install -e ".[databricks]"
+            displayName: Install skillkit
+          - script: skillkit build --out $(Build.ArtifactStagingDirectory)/bundle
+            displayName: Lint and build
+          - publish: $(Build.ArtifactStagingDirectory)/bundle
+            artifact: bundle
+
+  - stage: dev
+    dependsOn: build
+    variables: [{ group: genie-context-dev }]
+    jobs:
+      - deployment: deploy
+        environment: genie-context-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+
+  - stage: prod
+    dependsOn: dev
+    variables: [{ group: genie-context-prod }]
+    jobs:
+      - deployment: deploy
+        environment: genie-context-prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml

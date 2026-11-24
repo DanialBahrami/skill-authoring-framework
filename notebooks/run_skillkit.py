@@ -1,0 +1,45 @@
+# Databricks notebook source
+# MAGIC %md
+# MAGIC # Run skillkit in the workspace
+# MAGIC For authors who work in Genie Code instead of a local terminal. Clone `genie-context` and the
+# MAGIC source repos (e.g. data-platform) as Git folders side by side under `/Workspace/Users/<you>/`, then run
+# MAGIC this notebook on serverless. Set the widgets and run all. Evals call model serving endpoints as you.
+
+# COMMAND ----------
+
+# MAGIC %pip install -q pyyaml requests databricks-sdk
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+import os
+import sys
+
+me = spark.sql("SELECT current_user()").first()[0]
+default_root = f"/Workspace/Users/{me}/genie-context"
+
+dbutils.widgets.text("root", default_root, "genie-context folder")
+dbutils.widgets.text("repos_root", f"/Workspace/Users/{me}", "Folder holding source repo checkouts")
+dbutils.widgets.dropdown("command", "lint", ["lint", "catalog", "eval", "new", "freshness", "stale", "reviewed", "build"], "Command")
+dbutils.widgets.text("skills", "", "Skill names (space separated)")
+dbutils.widgets.text("extra", "", "Extra arguments, e.g. --case-filter silver-01 --inspect silver-01")
+
+root = dbutils.widgets.get("root")
+sys.path.insert(0, root)  # import skillkit straight from the Git folder, no install needed
+from skillkit.cli import main  # noqa: E402
+
+# COMMAND ----------
+
+command = dbutils.widgets.get("command")
+skills = dbutils.widgets.get("skills").split()
+extra = dbutils.widgets.get("extra").split()
+args = ["--root", root, command, *skills]
+if command == "eval":
+    args += ["--repos-root", dbutils.widgets.get("repos_root"), "--out", f"{root}/authoring/last-eval-report.md"]
+args += extra
+print("skillkit", " ".join(args[2:]))
+exit_code = main(args)
+print(f"\nexit code {exit_code}")

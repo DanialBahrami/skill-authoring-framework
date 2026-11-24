@@ -1,0 +1,27 @@
+# Illustrative draft written by hand as an example. Regenerate with the
+# context-authoring skill against data-platform before activating.
+owner: data-platform
+status: draft
+last_reviewed: 2026-11-23
+
+sources:
+  - repo: data-platform
+    paths:
+      - Databricks/Setup/Silver/**
+      - Databricks/Setup/Global/Silver/**
+      - Databricks/Common/silver_lib/merge_template*
+      - Databricks/Silver/crm_customer*
+      - Databricks/Global/**
+      - Databricks/bundle_resources/jobs/silver/**
+  - confluence:
+      page_id: "TODO"
+      title: How to create a new table
+      version: 1
+
+variants:
+  - reference: references/forecasting.md
+    owner: forecasting
+    applies_when: Notebook under the Forecasting folder or table in an Forecasting schema
+
+uses: []
+requires: []

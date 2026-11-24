@@ -1,0 +1,28 @@
+{
+  "skill_name": "{{name}}",
+  "evals": [
+    {
+      "id": "trigger-01",
+      "type": "trigger",
+      "prompt": "TODO: a request as a developer would type it, with real table names and context",
+      "expected_output": "TODO: what a correct answer does",
+      "agents": [],
+      "must_include": [],
+      "must_not_include": [],
+      "assertions": ["TODO: an observable result, e.g. Uses the X template instead of writing a MERGE by hand"]
+    },
+    {
+      "id": "trigger-02",
+      "type": "trigger",
+      "prompt": "TODO: a different phrasing, or a prompt that needs the skill without naming its domain",
+      "expected_output": "TODO",
+      "assertions": ["TODO"]
+    },
+    {
+      "id": "near-miss-01",
+      "type": "near_miss",
+      "prompt": "TODO: shares vocabulary with this skill but belongs to another skill or none",
+      "expect_skill": null
+    }
+  ]
+}

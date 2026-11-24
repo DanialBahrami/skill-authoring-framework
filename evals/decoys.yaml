@@ -1,0 +1,18 @@
+# Stand-ins for built-in Databricks skills and other installed skills, so the routing
+# test checks that our descriptions win only where they should. Keep descriptions close
+# to the real built-in ones; update when the built-in set changes.
+decoys:
+  - name: databricks-pipelines
+    description: Develop Lakeflow Spark Declarative Pipelines (formerly Delta Live Tables) on Databricks. Use when building batch or streaming data pipelines with Python or SQL.
+  - name: databricks-jobs
+    description: Develop and deploy Lakeflow Jobs on Databricks via bundles, Python SDK or the CLI. Use when creating data engineering jobs with notebooks, wheels, SQL or pipelines.
+  - name: databricks-dabs
+    description: Create, configure, validate, deploy and run Declarative Automation Bundles. Use when working with Databricks resources via bundles.
+  - name: databricks-unity-catalog
+    description: Unity Catalog governance and access control. Use to grant or revoke access, set up row filters and column masks, and query system tables.
+  - name: databricks-dbsql
+    description: Databricks SQL warehouse features. Use for SQL scripting, materialized views, AI functions and SQL best practices.
+  - name: databricks-data-discovery
+    description: Discover and query data via Genie. Use when the user asks where data lives, which tables exist, or a natural-language question about the data.
+  - name: databricks-spark-structured-streaming
+    description: Spark Structured Streaming for production workloads. Use for Kafka ingestion, triggers, watermarks and checkpoints.

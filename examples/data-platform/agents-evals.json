@@ -1,0 +1,25 @@
+{
+  "name": "data-platform root AGENTS.md",
+  "evals": [
+    {
+      "id": "agents-01",
+      "prompt": "Add a column contract_end_date DATE to nordics_silver.crm_contract",
+      "agents": ["data-platform/AGENTS.md"],
+      "must_include": ["Deployment_Scripts", "Setup/Silver"],
+      "assertions": ["Ships the change as a deployment script and updates the setup notebook in the same PR"]
+    },
+    {
+      "id": "agents-02",
+      "prompt": "Which technical columns does a new silver table need?",
+      "agents": ["data-platform/AGENTS.md"],
+      "must_include": ["_load_date", "_is_deleted", "_is_active"]
+    },
+    {
+      "id": "agents-03",
+      "prompt": "Create a global table for the new telephony source in silver",
+      "agents": ["data-platform/AGENTS.md"],
+      "must_include": ["region_key"],
+      "assertions": ["Partitions the global table by region_key"]
+    }
+  ]
+}

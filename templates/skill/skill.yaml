@@ -1,0 +1,29 @@
+# Repo-only metadata (the registry record for this skill). Stripped at build time;
+# owner and source commit are stamped into the deployed SKILL.md metadata instead.
+owner: {{owner}}            # team registered for the prefix in standard.yaml
+status: draft               # draft | active | deprecated
+last_reviewed: {{today}}
+
+# Where the knowledge came from. Drives the freshness checks.
+sources:
+  - repo: TODO-repo-name    # as named in Azure Repos
+    paths:                  # globs relative to the repo root; ** crosses folders
+      - TODO/path/**
+  # - confluence:
+  #     page_id: "123456"
+  #     title: Page title
+  #     version: 1          # keep page_id before version; confluence-check --write updates it
+  # - note: Agreed in the platform guild on how X is done (no written source)
+
+# Skills this one names in its steps (building blocks it uses). Name each one in
+# SKILL.md at the step that needs it. Platform skills never use team skills.
+uses: []
+
+# MCP servers, packages or services the skill depends on (registry "dependencies").
+requires: []
+
+# Optional: parts of this skill owned by another team (multi-team repos).
+# variants:
+#   - reference: references/<team>.md
+#     owner: <team>
+#     applies_when: The target notebook is under <folder> or the schema is <schema>

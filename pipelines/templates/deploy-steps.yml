@@ -1,0 +1,23 @@
+# Shared deploy steps: install skillkit, show the plan, apply it.
+# DEPLOY_FLAGS (optional, in the variable group): set to --no-prune while legacy skills
+# that are not yet in the repo must stay in the workspace.
+steps:
+  - checkout: self
+  - task: UsePythonVersion@0
+    inputs: { versionSpec: "3.11" }
+  - script: pip install -e ".[databricks]"
+    displayName: Install skillkit
+  - script: skillkit deploy --build $(Pipeline.Workspace)/bundle --dry-run ${DEPLOY_FLAGS:-}
+    displayName: Plan
+    env:
+      DATABRICKS_HOST: $(DATABRICKS_HOST)
+      ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+      ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+      ARM_TENANT_ID: $(ARM_TENANT_ID)
+  - script: skillkit deploy --build $(Pipeline.Workspace)/bundle ${DEPLOY_FLAGS:-}
+    displayName: Deploy
+    env:
+      DATABRICKS_HOST: $(DATABRICKS_HOST)
+      ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+      ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+      ARM_TENANT_ID: $(ARM_TENANT_ID)

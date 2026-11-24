@@ -1,0 +1,44 @@
+# Include in a source repo's PR build (e.g. data-platform) to flag skills that may need an update.
+# Non-blocking: it posts a PR comment listing affected skills and their owners.
+#
+# In the source repo's pipeline:
+#
+#   resources:
+#     repositories:
+#       - repository: genie_context
+#         type: git
+#         name: <project>/genie-context
+#   steps:
+#     - checkout: self
+#       fetchDepth: 0
+#     - template: pipelines/templates/source-repo-freshness.yml@genie_context
+#       parameters:
+#         repoName: data-platform
+#
+# The build service needs "Contribute to pull requests" on the source repo.
+
+parameters:
+  - name: repoName
+    type: string
+
+steps:
+  - checkout: genie_context
+    path: s/genie-context
+  - task: UsePythonVersion@0
+    inputs: { versionSpec: "3.11" }
+  - script: pip install -q -e "$(Pipeline.Workspace)/s/genie-context"
+    displayName: Install skillkit
+  - script: |
+      cd "$(Build.Repository.LocalPath)"
+      git diff --name-only "origin/$(System.PullRequest.TargetBranchName)...HEAD" > "$(Agent.TempDirectory)/changed.txt"
+      cd "$(Pipeline.Workspace)/s/genie-context"
+      skillkit freshness --repo "${{ parameters.repoName }}" \
+        --changed-file "$(Agent.TempDirectory)/changed.txt" --format markdown > "$(Agent.TempDirectory)/freshness.md"
+      cat "$(Agent.TempDirectory)/freshness.md"
+    displayName: Find affected Genie Code skills
+    condition: eq(variables['Build.Reason'], 'PullRequest')
+  - script: python "$(Pipeline.Workspace)/s/genie-context/pipelines/scripts/post_pr_comment.py" "$(Agent.TempDirectory)/freshness.md"
+    displayName: Comment on the PR
+    condition: eq(variables['Build.Reason'], 'PullRequest')
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)

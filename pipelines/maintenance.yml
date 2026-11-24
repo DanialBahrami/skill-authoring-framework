@@ -1,0 +1,80 @@
+# Weekly maintenance: overdue reviews, changed Confluence pages, full regression eval.
+# A failed run means at least one owner has work to do; the summary names who.
+
+trigger: none
+pr: none
+
+schedules:
+  - cron: "0 5 * * 1"     # Mondays 05:00 UTC
+    displayName: Weekly
+    branches: { include: [main] }
+    always: true
+
+resources:
+  repositories:
+    - repository: source_repo
+      type: git
+      name: <project>/data-platform   # TODO: <project>/<repo>
+      ref: refs/heads/main
+
+variables:
+  - group: genie-context-dev
+  - group: genie-context-confluence   # CONFLUENCE_BASE_URL, CONFLUENCE_TOKEN, optional CONFLUENCE_EMAIL
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+    path: s/genie-context
+  - checkout: source_repo
+    path: s/repos/data-platform
+  - task: UsePythonVersion@0
+    inputs: { versionSpec: "3.11" }
+  - script: pip install -e ".[databricks]"
+    displayName: Install skillkit
+    workingDirectory: $(Pipeline.Workspace)/s/genie-context
+
+  - script: skillkit stale | tee $(Build.ArtifactStagingDirectory)/stale.txt
+    displayName: Overdue reviews
+    continueOnError: true
+    workingDirectory: $(Pipeline.Workspace)/s/genie-context
+
+  - script: skillkit confluence-check | tee $(Build.ArtifactStagingDirectory)/confluence.txt
+    displayName: Changed Confluence sources
+    continueOnError: true
+    workingDirectory: $(Pipeline.Workspace)/s/genie-context
+    env:
+      CONFLUENCE_BASE_URL: $(CONFLUENCE_BASE_URL)
+      CONFLUENCE_TOKEN: $(CONFLUENCE_TOKEN)
+      CONFLUENCE_EMAIL: $(CONFLUENCE_EMAIL)
+
+  - script: |
+      skillkit eval --no-baseline --runs 3 --repos-root $(Pipeline.Workspace)/s/repos \
+        --out $(Build.ArtifactStagingDirectory)/eval-report.md \
+        --json $(Build.ArtifactStagingDirectory)/eval-results.json
+    displayName: Regression eval (all active skills)
+    continueOnError: true
+    workingDirectory: $(Pipeline.Workspace)/s/genie-context
+    env:
+      DATABRICKS_HOST: $(DATABRICKS_HOST)
+      ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+      ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+      ARM_TENANT_ID: $(ARM_TENANT_ID)
+
+  - script: skillkit catalog | tee $(Build.ArtifactStagingDirectory)/catalog.txt
+    displayName: Budget usage
+    workingDirectory: $(Pipeline.Workspace)/s/genie-context
+
+  - publish: $(Build.ArtifactStagingDirectory)
+    artifact: maintenance
+    condition: always()
+
+  - script: |
+      echo "One or more checks found work. See the maintenance artifact:"
+      echo "  stale.txt       -> owner re-checks the skill, runs 'skillkit reviewed <name>' or deprecates it"
+      echo "  confluence.txt  -> owner updates the skill (generator update mode), then 'confluence-check <name> --write'"
+      echo "  eval-report.md  -> owner reads the failing answer and fixes the skill or the case"
+      exit 1
+    displayName: Fail if any check found work
+    condition: eq(variables['Agent.JobStatus'], 'SucceededWithIssues')
