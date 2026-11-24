@@ -28,8 +28,15 @@ n = spark.sql(f"SELECT count(*) FROM {catalog}.bronze.contracts").first()[0]
 '''
 
 
+EXISTING = {"dev.bronze.contracts", "dev.silver.contracts_old", "dev.s.forbidden"}
+
+
 def plan(statement):
-    assert statement.startswith("EXPLAIN ")
+    assert statement.startswith(("EXPLAIN ", "DESCRIBE TABLE "))
+    if statement.startswith("DESCRIBE TABLE "):
+        name = statement.split()[-1]
+        return (True, "id\tbigint") if name in EXISTING else (
+            False, f"[TABLE_OR_VIEW_NOT_FOUND] The table or view `{name}` cannot be found.")
     if "bogus" in statement:
         return True, ("== Physical Plan ==\nError occurred during query planning: \n[UNRESOLVED_COLUMN.WITH_SUGGESTION] "
                       "A column with name `bogus` cannot be resolved.")
@@ -51,16 +58,109 @@ def test_substitute_forms():
     assert substitute("SELECT '12:30', a::int", {"a": "x"}) == "SELECT '12:30', a::int"
 
 
+def _find(report, prefix):
+    hits = [(c.status, c.detail) for c in report.checks if " ".join(c.statement.split()).startswith(prefix)]
+    assert len(hits) == 1, (prefix, hits)
+    return hits[0]
+
+
 def test_checker_statuses():
     report = SqlChecker(plan, {"catalog": "dev"}).check(ANSWER)
-    statuses = [(c.status, c.detail) for c in report.checks]
-    assert statuses[0] == ("skipped", "DDL is not checked")
-    assert statuses[1] == ("skipped", "uses a table created in this answer")
-    assert statuses[2][0] == "invalid" and "UNRESOLVED_COLUMN" in statuses[2][1] and "bogus" in statuses[2][1]
-    assert statuses[3] == ("skipped", "GRANT is not checked")
-    assert statuses[4] == ("skipped", "unresolved placeholder")
-    assert statuses[5] == ("ok", "")
-    assert report.summary() == "1 ok, 1 invalid, 4 skipped" and len(report.notes()) == 1
+    assert _find(report, "CREATE TABLE") == ("skipped", "DDL is not checked")
+    assert _find(report, "table dev.silver.contracts")[0] == "skipped"          # created by the answer
+    assert _find(report, "table dev.bronze.contracts") == ("ok", "")
+    assert _find(report, "MERGE INTO") == ("skipped", "uses a table created in this answer or expected to be new")
+    status, detail = _find(report, "SELECT id, bogus")
+    assert status == "invalid" and "UNRESOLVED_COLUMN" in detail
+    assert _find(report, "GRANT") == ("skipped", "GRANT is not checked")   # x.y.z: not a dev catalog table
+    assert _find(report, "SELECT * FROM <table>") == ("skipped", "unresolved placeholder")
+    assert _find(report, "SELECT count(*)") == ("ok", "")
+    assert _find(report, "n = spark.sql") == ("ok", "python syntax")
+    assert len(report.invalid) == 1
+
+
+def test_describe_catches_missing_merge_target_and_ignores_struct_fields():
+    answer = ("```sql\nMERGE INTO dev.silver.missing t USING dev.bronze.contracts s ON t.id = s.id "
+              "WHEN MATCHED THEN UPDATE SET t.addr = s.address.city\n```")
+    report = SqlChecker(plan, {"catalog": "dev"}).check(answer)
+    tables = {c.statement: c.status for c in report.checks if c.statement.startswith("table ")}
+    assert tables == {"table dev.silver.missing": "invalid", "table dev.bronze.contracts": "ok"}
+
+
+def test_python_and_yaml_are_checked_locally():
+    answer = ("```python\n    %run ./setup\n    df = spark.table('x')\n    def f(:\n        pass\n```\n"
+              "```yaml\nresources: [unclosed\n```\n```yaml\njobs:\n  name: ${var.env}\n```")
+    report = SqlChecker(plan).check(answer)
+    details = [(c.status, c.detail.split(":")[0]) for c in report.checks]
+    assert ("invalid", "python syntax") in details and ("invalid", "yaml") in details and ("ok", "yaml") in details
+
+
+def test_temp_views_unqualified_names_and_new_tables():
+    def runner(st):
+        if "orphan" in st:
+            return True, "Error occurred during query planning: [TABLE_OR_VIEW_NOT_FOUND] The table or view `orphan` cannot be found."
+        return plan(st)
+
+    answer = ("```sql\nCREATE OR REPLACE TEMP VIEW staged AS SELECT id FROM dev.bronze.contracts;\n"
+              "SELECT id FROM staged;\nSELECT id FROM orphan;\nSELECT id FROM dev.silver.zendesk_ticket\n```")
+    report = SqlChecker(runner, {"catalog": "dev"}).check(answer, new_tables=["zendesk"])
+    assert _find(report, "SELECT id FROM staged")[0] == "skipped"
+    assert _find(report, "SELECT id FROM orphan")[0] == "inconclusive"
+    assert _find(report, "SELECT id FROM dev.silver.zendesk_ticket")[0] == "skipped"
+    assert _find(report, "table dev.silver.zendesk_ticket")[0] == "skipped"
+    assert not report.invalid
+
+
+def test_guard_refuses_anything_else():
+    import pytest
+
+    from skillkit.execute import guard
+    for bad in ("DROP TABLE x", "SELECT 1", "describe history x", "  MERGE INTO x"):
+        with pytest.raises(ValueError):
+            guard(bad)
+    guard("explain select 1")
+    guard("DESCRIBE TABLE a.b.c")
+
+
+def test_spark_runner(monkeypatch):
+    import sys
+    import types
+
+    from skillkit.execute import spark_runner
+
+    class Session:
+        @staticmethod
+        def getActiveSession():
+            return Session()
+
+        def sql(self, statement):
+            if "missing" in statement:
+                raise RuntimeError("[TABLE_OR_VIEW_NOT_FOUND] `missing`")
+            return types.SimpleNamespace(collect=lambda: [("== Physical Plan ==",)])
+
+    fake = types.ModuleType("pyspark.sql")
+    fake.SparkSession = Session
+    monkeypatch.setitem(sys.modules, "pyspark", types.ModuleType("pyspark"))
+    monkeypatch.setitem(sys.modules, "pyspark.sql", fake)
+    run = spark_runner()
+    assert run("EXPLAIN SELECT 1") == (True, "== Physical Plan ==")
+    assert run("DESCRIBE TABLE missing")[0] is False
+
+
+def test_example_instructions_block_evals_and_build(repo: Path, capsys):
+    import pytest
+
+    from skillkit import lint
+    from skillkit.model import workspace_instructions_path
+
+    wi = workspace_instructions_path(repo)
+    wi.write_text("# Workspace\n\n<!-- EXAMPLE: replace -->\n- lakehouse_dev is the dev catalog\n")
+    assert any(f.code == "WI004" and f.severity == "warning"
+               for f in lint.lint_workspace_instructions(wi, load_standard(repo)))
+    with pytest.raises(SystemExit, match="still the framework's example"):
+        main(["--root", str(repo), "eval"])
+    assert main(["--root", str(repo), "build", "--out", str(repo / "build")]) == 1
+    assert "build refused" in capsys.readouterr().err
 
 
 def test_ctas_query_part_is_checked_and_permissions_are_inconclusive():
@@ -137,11 +237,14 @@ def test_checklist_has_journeys_read_files_and_no_file_open(repo: Path, tmp_path
     assert "Read repo files to answer?" in text and "**No file open**" in text
 
 
-def test_execute_needs_a_warehouse(repo: Path, monkeypatch):
+def test_execute_without_warehouse_needs_spark(repo: Path, monkeypatch):
+    import sys
+
     import pytest
 
     monkeypatch.delenv("DATABRICKS_WAREHOUSE_ID", raising=False)
-    with pytest.raises(SystemExit, match="warehouse"):
+    monkeypatch.setitem(sys.modules, "pyspark", None)
+    with pytest.raises(SystemExit, match="Spark session"):
         main(["--root", str(repo), "eval", "--execute"])
 
 
@@ -173,6 +276,19 @@ def test_warehouse_runner_sends_only_explain(monkeypatch):
     assert run("EXPLAIN SELECT 1") == (True, "== Physical Plan ==")
     assert run("EXPLAIN SELECT * FROM missing")[0] is False
     assert sent[0]["warehouse_id"] == "wh-1" and sent[0]["on_wait_timeout"].value == "CANCEL"
+    assert run("DESCRIBE TABLE a.b.c")[0] is True
     import pytest
     with pytest.raises(ValueError):
         run("DROP TABLE x")
+
+
+def test_journey_reachability(repo: Path):
+    _journey_repo(repo)   # dp-onboard-new-source uses dp-prepare-pr: reachable
+    skills = load_skills(repo)
+    assert not [f for f in lint.lint_journeys(repo, skills) if f.code == "JR002"]
+    _add_skill(repo, "dp-review-notebook", desc="Reviews a notebook. Use when the user asks for a notebook review.")
+    (repo / "evals" / "journeys.json").write_text(json.dumps({"journeys": [
+        {"id": "j", "prompt": "Onboard and review", "skills": ["dp-onboard-new-source", "dp-review-notebook"],
+         "must_include": ["x"]}]}))
+    found = [f for f in lint.lint_journeys(repo, load_skills(repo)) if f.code == "JR002"]
+    assert found and found[0].severity == "warning" and "dp-review-notebook" in found[0].message

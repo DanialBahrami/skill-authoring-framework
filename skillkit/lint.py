@@ -380,6 +380,9 @@ def lint_workspace_instructions(path: Path, std: Standard) -> list[Finding]:
         match = pattern.search(text)
         if match:
             _err(out, "WI003", where, f"contains {label}: '{match.group(0)}'")
+    if "<!-- EXAMPLE" in text:
+        _warn(out, "WI004", where, "still the framework's example: evals refuse to run and build refuses to deploy "
+              "until it holds your workspace's real instructions (or nothing) and the marker is removed")
     return out
 
 
@@ -411,6 +414,7 @@ def lint_journeys(root, skills: list[Skill]) -> list[Finding]:
         _err(out, "JR001", "evals/journeys.json", f"not valid JSON: {exc}")
         return out
     status = {s.name: s.status for s in skills}
+    uses = {s.name: s.uses for s in skills}
     seen: set[str] = set()
     for i, j in enumerate(data.get("journeys", []) or []):
         where = f"evals/journeys.json[{j.get('id', i)}]"
@@ -430,4 +434,17 @@ def lint_journeys(root, skills: list[Skill]) -> list[Finding]:
                 _err(out, "JR001", where, f"skill '{name}' is deprecated")
         if not (j.get("must_include") or j.get("assertions")):
             _warn(out, "JR001", where, "no must_include or assertions: the journey can only fail on routing")
+        # Genie Code reaches a later skill only if an earlier one names it (listed in `uses`).
+        if names and names[0] in status:
+            reach, todo = set(), [names[0]]
+            while todo:
+                cur = todo.pop()
+                if cur in reach or cur not in uses:
+                    continue
+                reach.add(cur)
+                todo += uses[cur]
+            for name in names[1:]:
+                if name in status and name not in reach:
+                    _warn(out, "JR002", where, f"'{name}' is not reachable from '{names[0]}' through `uses`: Genie Code "
+                          "would have to pick it on its own. Name it at the step that needs it, or drop it from the journey")
     return out

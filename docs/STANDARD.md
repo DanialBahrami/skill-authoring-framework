@@ -90,7 +90,7 @@ Each skill carries `evals/evals.json` with at least two `trigger` cases and one 
 
 Every expected behaviour in a case must be achievable without running anything: the model describes what it would do.
 
-With a development SQL warehouse, `--execute` adds an execution gate: the SQL in each answer is planned with `EXPLAIN`, and SQL that does not plan fails the run. A skill that uses other skills has a journey in `evals/journeys.json`, a task that needs the whole chain; `skillkit eval` runs the journeys that involve the skills it evaluates.
+With a development SQL warehouse or a notebook's Spark session, `--execute` adds an execution gate: the SQL in each answer is planned with `EXPLAIN`, tables in the development catalog get `DESCRIBE TABLE`, and Python and YAML blocks are syntax-checked; anything that fails fails the run. Only `EXPLAIN` and `DESCRIBE TABLE` are sent. Evals and builds refuse to run while `context/workspace-instructions.md` is still the framework's example. A skill that uses other skills has a journey in `evals/journeys.json`, a task that needs the whole chain; `skillkit eval` runs the journeys that involve the skills it evaluates.
 
 The PR pipeline runs this for changed skills (3 runs) and, for coexistence, the routing test for every active skill, and posts the report on the PR. During the pilot the eval gate is advisory; it becomes blocking once the suite is stable. Before activating a new skill, the author also runs two cases in a real Genie Code Agent-mode chat (`skillkit genie-checklist`) and notes the outcome in the PR.
 
