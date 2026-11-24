@@ -127,14 +127,14 @@ def test_supersedes_checks(repo: Path):
 
 
 def test_catalog_command_with_installed(repo: Path, tmp_path: Path, capsys):
-    installed = tmp_path / "installed" / "cdp-open-pr"
+    installed = tmp_path / "installed" / "legacy-open-pr"
     installed.mkdir(parents=True)
     (installed / "SKILL.md").write_text(
-        "---\nname: cdp-open-pr\ndescription: \"Prepares a pull request for the data-platform repo: branch, title code, "
+        "---\nname: legacy-open-pr\ndescription: \"Prepares a pull request for the data-platform repo: branch, title code, "
         "description, impact analysis. Use when the user asks to open, create or describe a PR.\"\n---\n")
     assert main(["--root", str(repo), "catalog", "--installed", str(tmp_path / "installed")]) == 0
     out = capsys.readouterr().out
-    assert "cdp-open-pr" in out and "planned + installed" in out and "overlap with installed" in out
+    assert "legacy-open-pr" in out and "planned + installed" in out and "overlap with installed" in out
 
 
 def test_check_names(repo: Path, tmp_path: Path, capsys):
