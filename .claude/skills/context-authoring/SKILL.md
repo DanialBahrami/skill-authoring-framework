@@ -1,7 +1,7 @@
 ---
 name: context-authoring
 description: >-
-  Generates and updates Genie Code context for a your organisation repo from its code and Confluence
+  Generates and updates Genie Code context for a repo from its code and Confluence
   pages: workspace skills, AGENTS.md files, workspace-instruction proposals and Unity Catalog
   comment proposals, all in the genie-context standard. Use when asked to create skills for a
   repo, team or domain, to onboard a team to Genie Code, to regenerate or update a skill after

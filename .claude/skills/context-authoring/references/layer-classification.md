@@ -8,7 +8,7 @@ Ask the questions in order; the first yes decides.
 | 2 | Is it a fact about one table or column (meaning, grain, source system, PII)? | Unity Catalog comment or tag (`uc-comments.sql`) | "One row per metering point per hour" |
 | 3 | Must it hold in every Genie Code response for every user in the workspace, even with no repo file open? | Workspace instructions (`workspace-instructions.diff.md`) | Environment table, never read PII rows, GDPR only via pipelines |
 | 4 | Is it a convention or vocabulary that any task in one repo or folder needs? | `AGENTS.md` of that repo or folder | Technical columns, region codes, folder layout, release branch names |
-| 5 | Is it a sequence of steps for a task people repeat, with your organisation-specific choices? | Skill | Onboard a source table, prepare a PR, daily load check |
+| 5 | Is it a sequence of steps for a task people repeat, with organisation-specific choices? | Skill | Onboard a source table, prepare a PR, daily load check |
 | 6 | Is it deterministic work (a lookup, a check, a generated snippet)? | `scripts/` inside the skill that needs it | Derive a storage path from widgets |
 | 7 | None of the above | Drop it, or ask the user | History of a decision, meeting notes |
 

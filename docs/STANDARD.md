@@ -1,6 +1,6 @@
 # Genie Code context standard
 
-Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` so they can be tuned without editing this file. The operating guide describes the workflow around it.
+Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` so they can be tuned without editing this file. The README describes the workflow around it.
 
 ## 1. What goes where
 
@@ -10,7 +10,7 @@ Context reaches Genie Code through four layers. Put each piece of knowledge in t
 |---|---|---|---|
 | Workspace instructions | Every response | Short rules that are always true: environments, hard constraints, PII and GDPR guardrails | Platform team |
 | `AGENTS.md` | When a file under that folder is open; Genie Code walks up the tree, so nested files stack | Conventions and vocabulary of a repo or a team folder | Repo or folder owner |
-| Workspace skill | Name and description always; body only when triggered | A repeatable task that needs your organisation-specific steps | Team registered for the prefix, reviewed by platform |
+| Workspace skill | Name and description always; body only when triggered | A repeatable task that needs organisation-specific steps | Team registered for the prefix, reviewed by platform |
 | Unity Catalog comments and tags | When the agent inspects a table | Facts about data: meaning, grain, source system, PII | Data owner |
 
 `AGENTS.md` holds only what the agent cannot infer from the code and docs: vocabulary, conventions, contract rules, non-obvious commands. People write it; the generator proposes candidate lines with evidence. (Measured: generated context files slightly lowered success and raised cost by over 20%; short human-written ones helped.) It gets its own with/without eval (`skillkit eval-context`).
