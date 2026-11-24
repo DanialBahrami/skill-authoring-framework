@@ -1,5 +1,5 @@
-# Illustrative draft written by hand as an example. Regenerate with the
-# context-authoring skill against data-platform before activating.
+# Fictional example for a made-up data-platform repo. It shows the format; it is not
+# meant to be activated. Delete it, or regenerate your own with the context-authoring meta-skill.
 owner: data-platform
 status: draft
 last_reviewed: 2026-11-23

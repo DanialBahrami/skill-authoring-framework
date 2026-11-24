@@ -193,3 +193,19 @@ def test_description_overlap_warning(repo: Path):
                "description, impact analysis. Use when the user asks to open, create or describe a PR.")
     found = [f for f in lint.lint_catalog(load_skills(repo), load_standard(repo)) if f.code == "CT003"]
     assert found and found[0].severity == "warning"
+
+
+def test_doc_source_accepted(repo: Path):
+    meta = repo / "skills" / "dp-prepare-pr" / "skill.yaml"
+    meta.write_text(meta.read_text() + "  - doc:\n      url: https://wiki.example.org/pr-process\n      title: PR process\n")
+    assert "SK014" not in codes(lint.lint_skill(load_skill(meta.parent), load_standard(repo)))
+
+
+def test_workspace_hosts_on_all_clouds_rejected(repo: Path):
+    md = repo / "skills" / "dp-prepare-pr" / "SKILL.md"
+    for host in ("dbc-1a2b3c4d-5e6f.cloud.databricks.com", "adb-123.4.azuredatabricks.net", "1234.5.gcp.databricks.com"):
+        original = md.read_text()
+        md.write_text(original + f"\nOpen https://{host}/ to check.\n")
+        found = [f.message for f in lint.lint_skill(load_skill(md.parent), load_standard(repo)) if f.code == "SK013"]
+        assert any("workspace host" in m for m in found), host
+        md.write_text(original)

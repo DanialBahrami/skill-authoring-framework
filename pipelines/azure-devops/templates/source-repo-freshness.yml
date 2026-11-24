@@ -11,7 +11,7 @@
 #   steps:
 #     - checkout: self
 #       fetchDepth: 0
-#     - template: pipelines/templates/source-repo-freshness.yml@genie_context
+#     - template: pipelines/azure-devops/templates/source-repo-freshness.yml@genie_context
 #       parameters:
 #         repoName: data-platform
 #
@@ -37,7 +37,7 @@ steps:
       cat "$(Agent.TempDirectory)/freshness.md"
     displayName: Find affected Genie Code skills
     condition: eq(variables['Build.Reason'], 'PullRequest')
-  - script: python "$(Pipeline.Workspace)/s/genie-context/pipelines/scripts/post_pr_comment.py" "$(Agent.TempDirectory)/freshness.md"
+  - script: python "$(Pipeline.Workspace)/s/genie-context/pipelines/azure-devops/scripts/post_pr_comment.py" "$(Agent.TempDirectory)/freshness.md"
     displayName: Comment on the PR
     condition: eq(variables['Build.Reason'], 'PullRequest')
     env:

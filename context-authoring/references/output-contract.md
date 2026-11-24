@@ -34,7 +34,8 @@ skills/<prefix>-<verb>-<object>/
 ## skill.yaml sources
 
 - Repo sources: the repo name and the narrowest globs that cover what the skill was distilled from. These drive the freshness hook; too broad and every PR flags the skill, too narrow and changes go unnoticed.
-- Confluence sources: `page_id`, `title`, `version` (in that order).
+- Confluence sources: `page_id`, `title`, `version` (in that order); a weekly check compares the version with the live page.
+- Other docs (any wiki or website): `doc:` with `url` and `title`; reviewed by age. Docs kept in a Git repo are repo sources, so their changes are detected like code.
 - Knowledge with no written source: `note:` with who agreed it.
 
 ## evals/evals.json
@@ -49,7 +50,7 @@ skills/<prefix>-<verb>-<object>/
 ```
 
 - Trigger prompts as a developer would type them, in different words from the description, with real context (table names, paths). Include at least one that needs the skill without naming its domain.
-- `must_include` for names that must appear (helpers, templates, technical columns); `must_not_include` for hardcoded environment values and the wrong approach (a hand-written MERGE).
+- `must_include` for names that must appear (helpers, templates, conventions); `must_not_include` for hardcoded environment values and the wrong approach (for example a hand-written MERGE where a template exists).
 - `assertions` for observable behaviour (asks for consent, verifies uniqueness, does not read PII rows). Drop assertions that pass with and without the skill; they show nothing.
 - At least one near miss that shares vocabulary but belongs to another skill or to none; set `expect_skill` when the right skill is known.
 - `agents:` lists the `AGENTS.md` files Genie Code would have loaded for that prompt.

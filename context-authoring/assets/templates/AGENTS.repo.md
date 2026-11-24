@@ -7,7 +7,7 @@
 
 ## What this repo is
 
-<Two or three sentences: what the platform does and how data flows through it.>
+<Two or three sentences: what the repo does, and anything about its structure the agent cannot see from the code.>
 
 ## Layout
 

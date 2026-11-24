@@ -1,6 +1,6 @@
 # Running the framework at scale
 
-The meta-skill (`context-authoring/`) drafts context. This guide covers the next step: a central `genie-context` repo with a standard, the `skillkit` CLI, and Azure DevOps pipelines that check, evaluate, deploy and keep that context current across teams and workspaces.
+The meta-skill (`context-authoring/`) drafts context. This guide covers stages 2–4 of adopting it: a central context repo (called `genie-context` here) with a standard, the `skillkit` CLI, and CI pipelines (GitHub Actions or Azure DevOps) that check, evaluate, deploy and keep that context current across teams and workspaces. Terms are defined in the [README](../README.md#2-key-terms).
 
 **Contents**
 
@@ -22,18 +22,22 @@ The meta-skill (`context-authoring/`) drafts context. This guide covers the next
 
 Done once by the platform team. Step 7 must happen before the first deploy, because the deploy removes workspace skills that are not in the repo.
 
-1. **Create the repo and adapt it to your organisation.** Everything organisation-specific is an example to replace:
-    - `standard.yaml`: `teams`, `prefixes` and reviewer groups; the environment catalog regex in `forbidden_patterns` (the example uses `lakehouse_dev|stg|prd`); eval endpoints.
+1. **Create the context repo from this framework and replace the examples.** Everything organisation-specific is an example:
+    - `standard.yaml`: `teams` (with their `codeowners` or `reviewers` groups), `prefixes`, the environment catalog regex in `forbidden_patterns` (the example uses `lakehouse_dev|stg|prd`), and the eval endpoints available in your workspace.
     - `context/workspace-instructions.md`: your environments and hard rules.
-    - `pipelines/*.yml`: the `<project>/data-platform` source repo names (marked `TODO`).
+    - `skills/dp-create-silver-table/` and `examples/data-platform/`: fictional; delete them or keep them for reference until your first skills exist.
     - `evals/decoys.yaml`: the built-in skills present in your workspace.
-    - `skills/dp-create-silver-table` and `examples/data-platform/`: a fictional example skill and `AGENTS.md`; delete or replace them.
-2. **Create a service principal**, add it to every target workspace, and grant it `CAN MANAGE` on `/Workspace/.assistant/` and the instructions file, plus `CAN QUERY` on the eval endpoints. Only admins can create items at the workspace root, so an admin creates the `.assistant` folder and an empty instructions file first.
-3. **Lock the skills folder**: all users `CAN READ` (Genie Code reads skills as the user); no other write grants.
-4. **Create variable groups** `genie-context-dev`, `genie-context-prod` (`DATABRICKS_HOST`, `ARM_*`) and `genie-context-confluence` (`CONFLUENCE_BASE_URL`, `CONFLUENCE_TOKEN`, `CONFLUENCE_EMAIL` for Cloud).
-5. **Create environments** `genie-context-dev` and `genie-context-prod`, with an approval check on prod.
-6. **Create the pipelines** from `pipelines/*.yml` (replace the `TODO` repo names). On `main`: require PRs, add `pr-validation` as a required build validation, add the reviewers printed by `skillkit reviewers`, and turn on "prohibit the most recent pusher from approving their own changes".
-7. **Import what exists**: merge the current workspace instructions into `context/workspace-instructions.md`; export existing workspace skills, then bring each into `skills/`, merge it, move it to `AGENTS.md`, or retire it. Set `DEPLOY_FLAGS=--no-prune` until every legacy skill is decided.
+2. **Create a service principal** and add it to every target workspace. Give it an OAuth secret (Databricks OAuth machine-to-machine works on AWS, Azure and GCP). Only admins can create items at the workspace root, so an admin first creates `/Workspace/.assistant/` and an empty `/Workspace/.assistant_workspace_instructions.md`. Grant the service principal `CAN MANAGE` on both, and `CAN QUERY` on the eval endpoints.
+3. **Lock the skills folder**: all users `CAN READ` on `/Workspace/.assistant/skills/` (Genie Code reads skills as the user); no other write grants.
+4. **Store the secrets in your CI**, per workspace: `DATABRICKS_HOST`, `DATABRICKS_CLIENT_ID`, `DATABRICKS_CLIENT_SECRET`. If skills cite Confluence pages: `CONFLUENCE_BASE_URL`, `CONFLUENCE_TOKEN`, and `CONFLUENCE_EMAIL` for Confluence Cloud. If source repos are private: a read token for them.
+    - GitHub Actions: environments `genie-context-dev` and `genie-context-prod` with these secrets, and required reviewers on prod.
+    - Azure DevOps: variable groups `genie-context-dev`, `genie-context-prod`, `genie-context-confluence`, and environments with an approval check on prod.
+    - On Azure, an Entra ID service principal can authenticate with `ARM_CLIENT_ID`, `ARM_CLIENT_SECRET` and `ARM_TENANT_ID` instead; the Databricks SDK accepts either.
+5. **Add the pipelines** from [`pipelines/github-actions/`](../pipelines/github-actions/) (copy to `.github/workflows/`) or [`pipelines/azure-devops/`](../pipelines/azure-devops/), and replace the source repo names marked `TODO`. See [section 10](#10-pipelines).
+6. **Protect `main`**: require pull requests and the PR validation check. Run `skillkit reviewers` to get the owners per path:
+    - GitHub: save the output as `.github/CODEOWNERS` and enable "Require review from Code Owners".
+    - Azure DevOps: `skillkit reviewers --format azure-devops` prints the required-reviewer path filters; also turn on "Prohibit the most recent pusher from approving their own changes".
+7. **Import what exists**: merge the current workspace instructions into `context/workspace-instructions.md`; export the existing workspace skills, then bring each into `skills/`, merge it, move it to `AGENTS.md`, or retire it. Set `DEPLOY_FLAGS=--no-prune` until every legacy skill is decided.
 8. **First deploy**: merge to `main` and check the plan step before approving prod.
 
 ## 2. Authoring workflow
@@ -89,9 +93,11 @@ The judge is a second model from a different family (set in `standard.yaml`). Th
 
 | Verdict | Meaning | Action |
 | --- | --- | --- |
-| **ADDS VALUE** | All cases pass, and at least one passes only with the skill | Merge |
+| **ADDS VALUE** | All cases pass, and at least one passes only with the skill | Activate and merge |
 | **NO EFFECT** | The model already gets it right | Don't merge; move one useful rule to `AGENTS.md` or drop it |
 | **FAILING** | A routing or answer case fails | Inspect with `--inspect <case-id>`; fix the skill, its description or the case |
+
+**Advisory or blocking.** During a pilot, run the PR gate in advisory mode (`EVAL_GATE=advisory`): failures show as warnings and reviewers decide. Switch to `blocking` once your eval cases are stable; then a FAILING or NO EFFECT verdict fails the PR.
 
 **Coexistence**: when any skill changes, the PR pipeline reruns routing for **every** active skill, so a new description cannot steal prompts from existing ones. The linter also warns when two descriptions overlap.
 
@@ -99,11 +105,11 @@ The judge is a second model from a different family (set in `standard.yaml`). Th
 
 ## 4. Multi-team repositories
 
-- The platform team defines a short **contract** in the repo's root `AGENTS.md` (technical columns, merge keys, PII tagging, deployment scripts, bundle rules). It applies in every folder.
-- Each team adds an `AGENTS.md` in its folder (`templates/AGENTS.team.md`) that states its overrides explicitly.
+- The platform team defines a short **contract** in the repo's root `AGENTS.md`: the few rules every team must follow, for example naming, required columns, PII tagging, how schema changes ship. It applies in every folder.
+- Each team adds an `AGENTS.md` in its folder (template: `context-authoring/assets/templates/AGENTS.team.md`) that states its overrides explicitly.
 - A shared task stays **one skill**. When a team does it differently, step 1 names the condition (folder or schema) and links `references/<team>.md`, declared under `variants` with its owner. Two skills for the same task would compete for the same prompts.
 - A difference that breaks the contract is fixed in the code, never documented as a variant.
-- Ownership is enforced by required reviewers per path; `skillkit reviewers` prints the filters.
+- Ownership is enforced by required reviewers per path; `skillkit reviewers` prints a CODEOWNERS file or Azure DevOps filters.
 
 ## 5. Skills that use other skills
 
@@ -135,8 +141,9 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 
 | Trigger | Detected by | Action |
 | --- | --- | --- |
-| Code a skill was written from changes | Source repo PR hook (`pipelines/templates/source-repo-freshness.yml`) comments with the affected skills and owners | Owner runs update mode with the changed paths |
-| A source Confluence page changes | Weekly run (`skillkit confluence-check`) | Update mode, then `confluence-check <name> --write` |
+| Code or Git-hosted docs a skill was written from change | Source repo PR hook (`source-repo-freshness.yml`) comments with the affected skills and owners | Owner runs update mode with the changed paths |
+| A cited Confluence page changes | Weekly run (`skillkit confluence-check`) | Update mode, then `confluence-check <name> --write` |
+| A cited page in another wiki changes | Not detected automatically; covered by the review period | Owner re-checks the page at review |
 | Review period passes (120 days) | Weekly run (`skillkit stale`) | Re-run evals; `skillkit reviewed <name>`, update or deprecate |
 | A wrong answer is reported | Users | Add the prompt as a failing eval case first, then fix |
 | An eval regresses | Weekly regression run | Inspect the answer; fix the skill or the case |
@@ -158,11 +165,11 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 | `build [--out]` | Lints, then bundles active skills and instructions with checksums |
 | `deploy [--build] [--dry-run] [--no-prune] [--profile]` | Verifies checksums, uploads skills, instructions and manifest |
 | `freshness --repo R --changed … \| --changed-file F` | Skills whose sources match changed files (`--format text\|markdown\|json`) |
-| `changed --base B` | Skills touched since `B` (all, if shared context changed) |
+| `changed --base B` | Skills touched since `B`, plus the skills that use them (all, if shared context changed) |
 | `stale` | Active skills past the review period |
 | `reviewed <skills>` | Sets `last_reviewed` to today |
 | `confluence-check [skills] [--write]` | Compares recorded Confluence versions with the live pages |
-| `reviewers` | Azure DevOps required-reviewer path filters and separation-of-duties settings |
+| `reviewers [--format codeowners\|azure-devops]` | Owners per path: a CODEOWNERS file (default) or Azure DevOps reviewer filters |
 
 **Lint codes**
 
@@ -184,7 +191,7 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 
 | Key | Purpose |
 | --- | --- |
-| `platform_team`, `teams`, `prefixes` | Who owns which skill prefix; reviewer groups |
+| `platform_team`, `teams`, `prefixes` | Who owns which skill prefix; each team's `codeowners` (GitHub) or `reviewers` (Azure DevOps) group |
 | `limits` | Description, body, catalog, instruction and `AGENTS.md` budgets |
 | `review_period_days` | When an active skill counts as stale |
 | `sections` | Required and optional `SKILL.md` sections |
@@ -195,20 +202,25 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 
 ## 10. Pipelines
 
-| File | Trigger | Does |
-| --- | --- | --- |
-| `pipelines/pr-validation.yml` | Branch policy build validation | Unit tests, lint, evals with baseline for changed skills (3 runs), routing for all skills, report posted on the PR. `EVAL_GATE=advisory` reports failures as warnings during a pilot; `blocking` fails the PR |
-| `pipelines/deploy.yml` | Merge to `main` | Build, deploy to dev, then prod after approval |
-| `pipelines/maintenance.yml` | Mondays 05:00 UTC | Stale reviews, changed Confluence pages, regression eval, budget use; fails if anything needs an owner |
-| `pipelines/templates/source-repo-freshness.yml` | Included in a source repo's PR build | Comments with the skills a change may affect |
+The same four jobs exist for GitHub Actions and Azure DevOps. Copy one set into your repos.
 
-The pipelines target Azure DevOps (Azure Repos ignores `pr:` triggers in YAML; use branch policies). The build service needs "Contribute to pull requests" to post comments.
+| Job | GitHub Actions | Azure DevOps | Runs | Does |
+| --- | --- | --- | --- | --- |
+| PR validation | `pipelines/github-actions/pr-validation.yml` | `pipelines/azure-devops/pr-validation.yml` | Every PR to the context repo | Unit tests, lint, evals with baseline for changed skills and the skills that use them (3 runs), routing for all skills, report posted on the PR |
+| Deploy | `pipelines/github-actions/deploy.yml` | `pipelines/azure-devops/deploy.yml` | Merge to `main` | Build, deploy to dev, then prod after approval |
+| Maintenance | `pipelines/github-actions/maintenance.yml` | `pipelines/azure-devops/maintenance.yml` | Mondays 05:00 UTC | Stale reviews, changed Confluence pages, regression eval, budget use; fails if an owner has work |
+| Source-repo freshness | `pipelines/github-actions/source-repo-freshness.yml` (copy into each source repo) | `pipelines/azure-devops/templates/source-repo-freshness.yml` (include from each source repo) | Every PR to a source repo | Comments with the skills the change may affect, and their owners; never blocks |
+
+Notes:
+
+- GitHub Actions: the workflows post comments with `gh pr comment` and need `pull-requests: write`. Private source or context repos need a read token secret (`SOURCE_REPO_TOKEN`, `CONTEXT_REPO_TOKEN`).
+- Azure DevOps: Azure Repos ignores `pr:` triggers in YAML, so add PR validation as a build validation branch policy. The build service needs "Contribute to pull requests" to post comments.
 
 ## 11. Development
 
 ```bash
 pip install -e ".[dev]"
-pytest -q          # 39 tests: lint rules, freshness, build and checksums, deploy (mocked), evals (fake LLM)
+pytest -q          # 42 tests: lint rules, freshness, build and checksums, deploy (mocked), evals (fake LLM)
 ```
 
 The code is plain Python with `pyyaml`, `requests` and (optionally) `databricks-sdk`. `deploy` and `eval` import the SDK lazily, so linting and building need no Databricks access.

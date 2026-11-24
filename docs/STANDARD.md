@@ -1,6 +1,6 @@
 # Genie Code context standard
 
-Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` so they can be tuned without editing this file. The README describes the meta-skill that drafts this context; `docs/operating.md` describes running it at scale.
+Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` so they can be tuned without editing this file. "Platform team" means the team that owns the context repo and the workspace instructions; "owning team" means the team registered for a skill's prefix. The README describes the meta-skill that drafts this context; `docs/operating.md` describes running it at scale.
 
 ## 1. What goes where
 
@@ -13,15 +13,15 @@ Context reaches Genie Code through four layers. Put each piece of knowledge in t
 | Workspace skill | Name and description always; body only when triggered | A repeatable task that needs organisation-specific steps | Team registered for the prefix, reviewed by platform |
 | Unity Catalog comments and tags | When the agent inspects a table | Facts about data: meaning, grain, source system, PII | Data owner |
 
-`AGENTS.md` holds only what the agent cannot infer from the code and docs: vocabulary, conventions, contract rules, non-obvious commands. People write it; the generator proposes candidate lines with evidence. (Measured: generated context files slightly lowered success and raised cost by over 20%; short human-written ones helped.) It gets its own with/without eval (`skillkit eval-context`).
+`AGENTS.md` holds only what the agent cannot infer from the code and docs: vocabulary, conventions, contract rules, non-obvious commands. People write it; the meta-skill proposes candidate lines with evidence. (Measured: generated context files slightly lowered success and raised cost by over 20%; short human-written ones helped.) It gets its own with/without eval (`skillkit eval-context`).
 
 A skill is justified only when all three hold:
 
 1. It describes a **task** someone does repeatedly ("onboard a source table"), not a topic ("PySpark patterns").
 2. Genie Code gets it wrong or inconsistent **without** the skill, shown by the baseline eval (section 5).
-3. The content is specific to us. Public Databricks documentation and built-in skills are already known to the agent.
+3. The content is specific to your organisation. Public Databricks documentation and built-in skills are already known to the agent.
 
-`AGENTS.md` loads only inside the repo. Tasks that usually start outside it (monitoring questions, data-source questions in the SQL editor) carry the vocabulary they need inside the skill.
+`AGENTS.md` loads only inside the repo. Tasks that usually start outside it (monitoring questions, data lookups in the SQL editor) carry the vocabulary they need inside the skill.
 
 ## 2. Token budget
 
@@ -91,14 +91,14 @@ The PR pipeline runs this for changed skills (3 runs) and, for coexistence, the 
 
 ## 6. Ownership and freshness
 
-`skill.yaml` is the registry record. It holds `owner` (the team registered for the prefix), `status` (`draft`: linted, not deployed; `active`: deployed; `deprecated`: not deployed, kept until removed), `last_reviewed`, `sources` (repo globs, Confluence page id + version, or a note), `uses` (skills it names), `requires` (MCP servers, packages, services) and optional `variants`.
+`skill.yaml` is the registry record. It holds `owner` (the team registered for the prefix), `status` (`draft`: linted, not deployed; `active`: deployed; `deprecated`: not deployed, kept until removed), `last_reviewed`, `sources` (repo globs, Confluence page id + version, other doc pages by URL, or a note), `uses` (skills it names), `requires` (MCP servers, packages, services) and optional `variants`.
 
 Security: the linter warns on scripts, network calls, external URLs and paths outside the skill; any such warning needs a reviewer to check it against the stated purpose. Authors cannot approve their own changes (branch policy).
 
 Freshness is checked in three ways:
 
 - **Source change.** A source repo's PR build runs `skillkit freshness` and comments on the PR with the affected skills and owners.
-- **Confluence change.** The weekly pipeline compares recorded page versions with the live pages.
+- **Doc change.** Docs kept in Git are repo sources and are caught by the source-change check. For Confluence, the weekly pipeline compares recorded page versions with the live pages. Other doc pages are covered by the age check.
 - **Age.** The weekly pipeline fails for active skills not reviewed within the period in `standard.yaml`.
 
 ## 7. Multi-team repositories
@@ -110,7 +110,7 @@ Freshness is checked in three ways:
 
 ## 8. Authoring
 
-Skills are drafted by the `context-authoring` generator from code and Confluence, then maintained by hand in pull requests. The generator is rerun in update mode for one skill when its sources change; its output is reviewed as a diff. Hand-written skills follow the same lint, eval and review.
+Skills are drafted by the `context-authoring` meta-skill from code and docs, then maintained by hand in pull requests. The meta-skill is rerun in update mode for one skill when its sources change; its output is reviewed as a diff. Hand-written skills follow the same lint, eval and review.
 
 ## 9. Review checklist
 

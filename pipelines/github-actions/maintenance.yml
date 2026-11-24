@@ -1,0 +1,83 @@
+# Weekly maintenance: overdue reviews, changed Confluence pages, regression eval, budget use.
+# Copy to .github/workflows/ in your genie-context repo. A failed run means an owner has work;
+# the uploaded artifact says what.
+#
+# Secrets: DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET, SOURCE_REPO_TOKEN;
+# CONFLUENCE_BASE_URL, CONFLUENCE_TOKEN, CONFLUENCE_EMAIL (only if skills cite Confluence pages).
+
+name: maintenance
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"   # Mondays 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REPO: my-org/data-platform   # TODO: your source repo
+  HAS_CONFLUENCE: ${{ secrets.CONFLUENCE_BASE_URL != '' }}
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: genie-context }
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: repos/${{ env.SOURCE_REPO }}
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install skillkit
+        working-directory: genie-context
+        run: pip install -e ".[databricks]"
+
+      - name: Overdue reviews
+        id: stale
+        continue-on-error: true
+        working-directory: genie-context
+        run: skillkit stale | tee stale.txt
+
+      - name: Changed Confluence sources
+        id: confluence
+        if: env.HAS_CONFLUENCE == 'true'
+        continue-on-error: true
+        working-directory: genie-context
+        env:
+          CONFLUENCE_BASE_URL: ${{ secrets.CONFLUENCE_BASE_URL }}
+          CONFLUENCE_TOKEN: ${{ secrets.CONFLUENCE_TOKEN }}
+          CONFLUENCE_EMAIL: ${{ secrets.CONFLUENCE_EMAIL }}
+        run: skillkit confluence-check | tee confluence.txt
+
+      - name: Regression eval (all active skills)
+        id: eval
+        continue-on-error: true
+        working-directory: genie-context
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+        run: skillkit eval --no-baseline --runs 3 --repos-root ../repos/$(dirname "$SOURCE_REPO") --out eval-report.md
+
+      - name: Budget use
+        working-directory: genie-context
+        run: skillkit catalog | tee catalog.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maintenance
+          path: genie-context/*.txt
+          if-no-files-found: ignore
+
+      - name: Fail if any check found work
+        if: steps.stale.outcome == 'failure' || steps.confluence.outcome == 'failure' || steps.eval.outcome == 'failure'
+        run: |
+          echo "stale.txt      -> owner re-checks the skill: skillkit reviewed <name>, update, or deprecate"
+          echo "confluence.txt -> owner runs update mode, then skillkit confluence-check <name> --write"
+          echo "eval-report.md -> owner reads the failing answer and fixes the skill or the case"
+          exit 1

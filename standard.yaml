@@ -1,21 +1,26 @@
 # Tunable parts of the Genie Code context standard (docs/STANDARD.md).
 # skillkit reads this file; change limits here, not in code.
+# The team who owns the context repo (the "platform team") approves changes to this file.
 
 version: 1
 
-platform_team: data-platform
+platform_team: data-platform   # owns the context repo, workspace instructions and this file
 
-# Teams that own skills. `reviewers` is the Azure DevOps group added as a
-# required reviewer for that team's paths (see `skillkit reviewers`).
+# EXAMPLE VALUES: replace teams, prefixes and reviewer groups with your own.
+# `codeowners` is the GitHub team for CODEOWNERS; `reviewers` the Azure DevOps group
+# for branch policies. `skillkit reviewers` prints either.
 teams:
   data-platform:
     name: Data Platform
+    codeowners: "@my-org/data-platform"
     reviewers: "[MyProject]\\Data Platform Team"
   forecasting:
     name: Forecasting
+    codeowners: "@my-org/forecasting"
     reviewers: "[MyProject]\\Forecasting Team"
   analytics:
     name: Analytics
+    codeowners: "@my-org/analytics"
     reviewers: "[MyProject]\\Analytics Team"
 
 # Skill name prefix -> owning team. A skill named dp-... must be owned by data-platform.
@@ -53,10 +58,10 @@ catalog:
 # Patterns that must not appear in skills (SKILL.md, references/, assets/, scripts/).
 # Environment-specific values belong in workspace instructions or bundle variables.
 forbidden_patterns:
-  - name: environment catalog name
+  - name: environment catalog name          # EXAMPLE: replace with your catalog names
     regex: '\blakehouse_(dev|stg|prd)\b'
-  - name: workspace host
-    regex: 'adb-\d+\.\d+\.azuredatabricks\.net'
+  - name: workspace host                    # AWS, Azure and GCP workspace URLs
+    regex: '[\w.-]+\.(cloud\.databricks\.com|azuredatabricks\.net|gcp\.databricks\.com)'
   - name: email address
     regex: '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,}'
   - name: GUID (pool, warehouse, service principal or tenant id)

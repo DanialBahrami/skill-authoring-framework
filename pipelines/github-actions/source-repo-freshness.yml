@@ -1,0 +1,42 @@
+# Put this in a SOURCE repo (the code your skills describe), as .github/workflows/genie-freshness.yml.
+# On each PR it comments with the Genie Code skills the change may affect, and their owners.
+# Non-blocking.
+#
+# Secret: CONTEXT_REPO_TOKEN (read access to the genie-context repo, if it is private).
+
+name: genie-freshness
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  CONTEXT_REPO: my-org/genie-context   # TODO: your context repo
+  REPO_NAME: data-platform             # this repo's name as written in skill.yaml sources
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, path: source }
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CONTEXT_REPO }}
+          token: ${{ secrets.CONTEXT_REPO_TOKEN || github.token }}
+          path: genie-context
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -q -e genie-context
+      - name: Find affected skills
+        run: |
+          git -C source diff --name-only "origin/${{ github.base_ref }}...HEAD" > changed.txt
+          skillkit --root genie-context freshness --repo "$REPO_NAME" --changed-file changed.txt --format markdown > freshness.md
+          cat freshness.md
+      - name: Comment on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '[ -s freshness.md ] && gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file freshness.md || true'
