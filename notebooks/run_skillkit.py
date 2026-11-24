@@ -39,7 +39,11 @@ command = dbutils.widgets.get("command")
 skills = dbutils.widgets.get("skills").split()
 extra = dbutils.widgets.get("extra").split()
 args = ["--root", root, command, *skills]
-installed = "/Workspace/.assistant/skills"  # what workspace users already have
+import yaml
+
+catalog_conf = (yaml.safe_load(open(f"{root}/standard.yaml")) or {}).get("catalog", {}) or {}
+installed = catalog_conf.get("installed_folder", "/Workspace/.assistant/skills")  # what workspace users already have
+use_installed = catalog_conf.get("installed_skills", "use") == "use"
 if command == "eval":
     args += ["--repos-root", dbutils.widgets.get("repos_root"), "--out", f"{root}/authoring/last-eval-report.md"]
 if command == "eval" and dbutils.widgets.get("execute") == "yes":
@@ -47,7 +51,7 @@ if command == "eval" and dbutils.widgets.get("execute") == "yes":
     args += ["--execute"]
     if dbutils.widgets.get("warehouse_id"):
         args += ["--warehouse-id", dbutils.widgets.get("warehouse_id")]
-if command in ("eval", "catalog") and os.path.isdir(installed):
+if command in ("eval", "catalog") and use_installed and os.path.isdir(installed):
     args += ["--installed", installed]
 args += extra
 print("skillkit", " ".join(args[2:]))

@@ -23,9 +23,10 @@ Read code before docs. Where they disagree, record both in `conflicts.md`; the c
 In a large repo you will not read everything, and that is fine as long as it is visible. Before the inventory, fill `coverage.md`:
 
 1. List the folders in scope with their file counts (`find <folder> -type f | wc -l`, or the file browser).
-2. Sort each into a kind: **production** (deployed code and shared helpers: referenced from bundles, jobs or CI), **team-owned** (a team's production folder), **ad hoc** (personal or exploratory scripts, many similar one-off files, no job references them), **archive** (`old`, `archive`, `deprecated`, untouched for a long time).
-3. Read production and team-owned folders first. Take conventions, helpers and examples only from them; ad hoc code shows what people actually struggle with (gotchas), not how it should be done. Skip archives unless a doc points there.
-4. Record how closely you read each folder. A folder you only skimmed is "sampled" or "names only", and its tasks go to `backlog.md`, not into skills.
+2. Sort each into a kind: **production** (deployed code: referenced from bundles, jobs or CI), **shared library** (helpers and templates others call), **team-owned** (a team's production folder), **tooling** (CI, deployment scripts, bundle files), **ad hoc** (personal or exploratory scripts, proofs of concept, many similar one-off files that no job references), **archive** (`old`, `archive`, `backup`, `deprecated`, untouched for a long time), **generated** (build output, exports).
+3. Read in this order: shared libraries and templates, production folders, tooling, then a sample of team-owned folders. Take conventions, helpers and examples only from these; ad hoc code shows what people actually struggle with (gotchas), not how it should be done. List archive and generated folders only.
+4. Don't open hundreds of similar files: use content search (`grep -rl`, `grep -c`) for counts and patterns ("which notebooks call `merge_table_silver`", "how many use `full` loads"), and record the command and its scope as the source.
+5. Record how closely you read each folder. A folder read only by names, or skipped, cannot produce a skill in this run: its tasks go to `backlog.md`.
 
 ## Signals in the code
 
@@ -53,7 +54,7 @@ In a large repo you will not read everything, and that is fine as long as it is 
 | Troubleshooting pages, incident write-ups, FAQ | Gotchas and failure fixes |
 | Pages that describe something the code no longer does | A docs-vs-code conflict, not a fact |
 
-Record every page you read in the "Docs read" table of `coverage.md`: useful or not (empty, only meeting links, outdated) and whether it contradicts the code. That list tells page owners what to fix first.
+Record every page you read in the "Docs read" table of `coverage.md`: its id and version (so the next run sees whether it changed), whether it is useful or thin (empty, only links or headings, outdated), and whether it contradicts the code. That list tells page owners what to fix first.
 
 Skip meeting notes, history of decisions and anything that restates public Databricks documentation.
 

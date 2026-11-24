@@ -13,7 +13,7 @@ Three checks, in order: the output follows the contract, every name in it is rea
 
 ## 1. Contract
 
-With `skillkit`: `skillkit lint <names>` and fix every error. Warnings marked SK020 (scripts, network calls, external URLs) go to the human reviewer.
+With `skillkit`: `skillkit lint` (no names, so the catalog, journey and dependency checks run too) and fix every error. SK023 warns about assertions a model cannot satisfy without running anything ("names the latest release branch", "lists the existing tables"); rewrite them to expect the query or the step. Warnings marked SK020 (scripts, network calls, external URLs) go to the human reviewer.
 
 Without it, check by hand and write the result in `summary.md`:
 
@@ -34,7 +34,7 @@ Without it, check by hand and write the result in `summary.md`:
 
 For every helper, template, table, column, widget, parameter and command in the generated files, find it in the source repo (or the doc it came from). Fix or remove anything that is not there. This catches most invented content, and evals do not: a confident wrong name can still pass a rubric.
 
-With `skillkit`: `skillkit check-names <names> --repo <source repo checkout>` looks up every inline code span in the skill and its references, as a file or folder name and in file contents, and lists what it cannot find. Placeholders (`<table>`, `YYYY.MM.DD`) and commands with arguments are skipped. Treat the list as questions, not errors: a value the user types or a workspace group legitimately appears in no file.
+With `skillkit`: `skillkit check-names <names> --repo <source repo checkout>` looks up every inline code span in the skill and its references, as a file or folder name and in file contents, and lists what it cannot find. Placeholders (`<table>`, `YYYY.MM.DD`) and commands with arguments are skipped. Treat the list as questions, not errors: a value the user types or a workspace group legitimately appears in no file; pass those with `--ignore` so the list stays short.
 
 ## 3. Evals
 

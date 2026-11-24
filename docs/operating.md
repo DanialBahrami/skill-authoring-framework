@@ -85,7 +85,7 @@ At least two `trigger` cases and one `near_miss`; more are expected for active s
 
 | Test | Model sees | Passes when |
 | --- | --- | --- |
-| Routing (every case) | Every skill in the repo that is not deprecated (drafts included), skills installed in the workspace with `--installed` (minus those a repo skill supersedes), decoys for built-in skills. Only the named skills are scored | Trigger: picks this skill at a rate ≥ 0.5 over `--runs`. Near miss: does not |
+| Routing (every case) | Every skill in the repo that is not deprecated (drafts included), skills installed in the workspace with `--installed` (minus those a repo skill supersedes; the notebook passes it unless `catalog.installed_skills: ignore` in `standard.yaml`), decoys for built-in skills. Only the named skills are scored | Trigger: picks this skill at a rate ≥ 0.5 over `--runs`. Near miss: does not |
 | Answer with skill (trigger cases) | Workspace instructions, the case's `AGENTS.md` files, skills in `uses`, the skill | Every `must_include` matches, no `must_not_include` matches, the judge passes every assertion — on a majority of runs |
 | Answer without skill | The same minus the skill | Same scoring: the baseline |
 
@@ -96,7 +96,7 @@ The judge is a second model from a different family (set in `standard.yaml`). Th
 | **ADDS VALUE** | All cases pass, and at least one passes only with the skill | Activate and merge |
 | **NO EFFECT** | The model already gets it right | Don't merge; move one useful rule to `AGENTS.md` or drop it |
 | **FAILING** | A routing or answer case fails | Inspect with `--inspect <case-id>`; fix the skill, its description or the case |
-| **INCONCLUSIVE** | Answers were cut off at the token limit (reported per case as "cut off") | Set `eval: max_tokens` in the skill's `skill.yaml` (default `eval.max_tokens` in `standard.yaml`) and run again |
+| **INCONCLUSIVE** | Answers were cut off at the token limit (reported per case as "cut off"); fails the run, since nothing was verified | Set `eval: max_tokens` in the skill's `skill.yaml` (default `eval.max_tokens` in `standard.yaml`) and run again |
 
 **Execution gate (optional).** Rubrics see whether code looks right; the gate checks it against the development workspace without running it. With `--execute --warehouse-id <dev warehouse>` (or `EVAL_WAREHOUSE_ID` in the pipelines; in a notebook without a warehouse, the active Spark session):
 
@@ -104,9 +104,9 @@ The judge is a second model from a different family (set in `standard.yaml`). Th
 - every fully qualified table in a development catalog gets `DESCRIBE TABLE`, including `MERGE`, `INSERT` and `ALTER` targets. The catalogs are `eval.execution.catalogs` in `standard.yaml`, or by default the values of the SQL variables, so `alias.struct.field` is never mistaken for a table;
 - Python blocks are compiled (syntax only) and YAML blocks parsed, locally.
 
-Only `EXPLAIN` and `DESCRIBE TABLE` are ever sent; both read metadata, never rows. Variables the skills use (`${catalog}`, `{{catalog}}`, `{catalog}`, `:catalog`) are filled from `eval.execution.variables` or `--sql-var name=value`. A statement that does not plan, a table that does not exist, or a syntax error fails the run. Missing permissions, unbound parameters and unqualified names that may be temp views defined elsewhere are inconclusive. Tables the answer creates, or that match the case's `exec_new_tables` regexes (a source not onboarded yet), are skipped. DDL, grants and statements with placeholders are not checked, and PySpark DataFrame code is checked for syntax only.
+Only `EXPLAIN` and `DESCRIBE TABLE` are ever sent; both read metadata, never rows. Variables the skills use (`${catalog}`, `{{catalog}}`, `{catalog}`, `:catalog`) are filled from `eval.execution.variables` or `--sql-var name=value`. A statement that does not plan, a table that does not exist, or a syntax error fails the run. Missing permissions, unbound parameters and unqualified names that may be temp views defined elsewhere are inconclusive. Tables the answer creates, or that match the case's `exec_new_tables` regexes (a source not onboarded yet), are skipped, and so are columns the answer adds with `ALTER TABLE ... ADD COLUMN(S)` or the case lists in `exec_new_columns`. Tables a PySpark answer creates (`saveAsTable`, `toTable`, `tableName`, `@dlt.table(name=…)`) count as created too. Variables also fill the legacy widget syntax `$name`; YAML excerpts that start indented are not checked on their own. DDL, grants and statements with placeholders are not checked, and PySpark DataFrame code is checked for syntax only.
 
-**Journeys.** `evals/journeys.json` holds tasks that span several skills (template: `context-authoring/assets/templates/journeys.json`). `skillkit eval` runs every journey that involves a skill under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. A failing journey fails the eval. Because the simulation loads all skills up front, it shows whether skills hand over, not whether Genie Code loads a skill named in another skill's steps; the journeys section of `skillkit genie-checklist` covers that in a real chat.
+**Journeys.** `evals/journeys.json` holds tasks that span several skills (template: `context-authoring/assets/templates/journeys.json`). `skillkit eval` runs every journey that involves a skill under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. A failing journey fails the eval. Each journey also runs without any skill: one that passes then too is reported, because its checks do not test the skills. Because the simulation loads all skills up front, it shows whether skills hand over, not whether Genie Code loads a skill named in another skill's steps; the journeys section of `skillkit genie-checklist` covers that in a real chat.
 
 **Repeat runs.** Results are cached per case in `.skillkit-cache/` (git-ignored), keyed by everything that can change them: prompts, skill text, context, catalog, model, judge, limits and runs. A repeat run with `--runs 3` therefore re-runs only the cases whose inputs changed. `--refresh-failed` also re-runs failed and inconclusive cases; `--no-cache` ignores the cache.
 
@@ -172,7 +172,7 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 | `lint [skills]` | Checks skills; with no names also catalog budget, overlap, dependencies and workspace instructions |
 | `lint-agents <files>` | Checks `AGENTS.md` files (size, no emails or tokens) |
 | `catalog [--installed DIR]` | Skills, status, owner, description tokens; active and planned (active + drafts, minus superseded) budget; with `--installed`, skills already in the workspace, their share of the budget and overlap with repo skills |
-| `check-names [skills] --repo R [--repo R2] [--strict]` | Names in skills and their references (inline code) that are not found in the source repos, as file names or in contents |
+| `check-names [skills] --repo R [--repo R2] [--ignore N …] [--strict]` | Names in skills, their references and Markdown assets (inline code) that are not found in the source repos, as paths (globs allowed), file names or in contents |
 | `genie-checklist [skills] [--prompts N] [--out F]` | Prompts to paste in Genie Code and what to look for, per skill and per journey, with a no-file-open prompt and a "read repo files?" check |
 | `new <name>` | Scaffolds a draft skill; owner from the prefix |
 | `eval [skills]` | Routing and answer tests with baseline. `--mode all\|routing\|answer`, `--runs N`, `--threshold`, `--no-baseline`, `--require-value`, `--case-filter`, `--inspect ID`, `--repos-root`, `--agents-drafts DIR`, `--installed DIR`, `--no-cache`, `--refresh-failed`, `--no-journeys`, `--execute`, `--warehouse-id`, `--sql-var NAME=VALUE`, `--allow-example-instructions`, `--model`, `--judge`, `--out`, `--json` |
@@ -199,6 +199,7 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `pipeli
 | SK020 | Security review warnings: scripts, network calls, external URLs, paths outside the skill |
 | SK021 | `uses` matches the skills named in the body; dependencies exist and are active |
 | SK022 | `supersedes`: not itself; the superseded repo skill is deprecated once this one is active |
+| SK023 | An assertion needs facts the model cannot know without running anything (warning) |
 | CT001–CT004 | Catalog budget (error for active skills, warning when active and drafts together exceed it); duplicate names; description overlap; dependency cycles, depth and direction |
 | JR001 | `evals/journeys.json`: unique ids, a prompt, at least two known skills that are not deprecated |
 | JR002 | Every skill in a journey is reachable from its first skill through `uses` (warning) |

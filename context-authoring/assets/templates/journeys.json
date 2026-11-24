@@ -8,6 +8,7 @@
       "must_include": ["TODO: a name from the second or later skill, which only appears if the hand-over worked"],
       "must_not_include": ["TODO: a hardcoded environment value"],
       "exec_new_tables": ["TODO: regex of a table the task creates, e.g. crm_contracts"],
+      "exec_new_columns": ["TODO: a column the task adds through a template, e.g. contract_end_date"],
       "assertions": ["TODO: the table or parameter one skill produces is the one the next skill uses"]
     }
   ]

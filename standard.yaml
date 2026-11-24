@@ -52,6 +52,11 @@ sections:
   optional: [Gotchas, Rules, Examples, References]
 
 catalog:
+  # Skills installed in the workspace outside this context repo: "use" counts them in the budget,
+  # routing evals and overlap checks (with --installed); "ignore" leaves them out of runs entirely,
+  # for organisations that treat other skill sets as out of scope.
+  installed_skills: use
+  installed_folder: /Workspace/.assistant/skills
   overlap_warning: 0.5       # description word overlap (Jaccard) that triggers a coexistence warning
   max_dependency_depth: 2    # workflow -> block -> block at most
 
