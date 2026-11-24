@@ -340,7 +340,7 @@ def cmd_eval(args) -> int:
             root, std, all_skills, journeys, llm, repos_root=Path(args.repos_root) if args.repos_root else None,
             drafts_root=Path(args.agents_drafts) if args.agents_drafts else None, runs=args.runs,
             threshold=args.threshold, installed=installed, cache=cache, refresh_failed=args.refresh_failed,
-            checker=checker)
+            checker=checker, baseline=not args.no_baseline)
         warnings += jwarn
     if cache is not None:
         save_cache(root, cache)

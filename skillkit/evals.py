@@ -289,10 +289,12 @@ def load_decoys(root: Path) -> list[dict[str, str]]:
     return list((yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("decoys", []))
 
 
-def catalog_for_routing(root: Path, all_skills: list[Skill], installed: list | None = None) -> str:
-    """Everything a user could end up with: repo skills that are not deprecated (drafts included),
-    installed skills that no repo skill supersedes, and decoys for built-in skills."""
-    catalog_skills = [s for s in all_skills if s.status != "deprecated"]
+def catalog_for_routing(root: Path, all_skills: list[Skill], installed: list | None = None,
+                        targets: set[str] | None = None) -> str:
+    """Everything a user could end up with: repo skills that are not deprecated (drafts included,
+    and a deprecated skill while it is being evaluated), installed skills that no repo skill
+    supersedes, and decoys for built-in skills."""
+    catalog_skills = [s for s in all_skills if s.status != "deprecated" or s.name in (targets or set())]
     superseded = {name for s in catalog_skills for name in s.supersedes}
     repo_names = {s.name for s in all_skills}
     catalog = [f"{s.name}: {s.description}" for s in catalog_skills]
@@ -315,7 +317,7 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
     by_name = {s.name: s for s in all_skills}
     warnings: list[str] = []
 
-    catalog_text = catalog_for_routing(root, all_skills, installed)
+    catalog_text = catalog_for_routing(root, all_skills, installed, {t.name for t in targets})
     pattern = re.compile(case_filter) if case_filter else None
 
     results: list[CaseResult] = []
@@ -545,9 +547,10 @@ def run_journeys(root: Path, std: Standard, all_skills: list[Skill], journeys: l
                  repos_root: Path | None = None, drafts_root: Path | None = None, runs: int = 1,
                  threshold: float | None = None, installed: list | None = None,
                  cache: dict[str, Any] | None = None, refresh_failed: bool = False, checker=None,
-                 log=print) -> tuple[list[CaseResult], list[str]]:
+                 baseline: bool = True, log=print) -> tuple[list[CaseResult], list[str]]:
     """Run each journey: routing must pick its first skill; the answer, with every skill of the
-    journey loaded, must pass its checks. This tests that the skills hand over to each other
+    journey loaded, must pass its checks. With `baseline`, the journey also runs without any skill:
+    if it passes then too, its checks do not test the skills (reported, not failed). This tests that the skills hand over to each other
     (names, tables and parameters line up). It cannot test whether Genie Code loads a skill
     named in another skill's steps; the Genie Code checklist covers that."""
     model = std.eval.get("model_endpoint")
@@ -591,7 +594,7 @@ def run_journeys(root: Path, std: Standard, all_skills: list[Skill], journeys: l
         warnings += warn
         loaded = "".join(f"\n\n# Skill loaded: {s.name}\n{s.reference_text()}" for s in skills)
         answer_key = _key("journey-answer", model, judge_ep, AGENT_SYSTEM, JUDGE_SYSTEM, context, loaded, j, limit,
-                          runs, getattr(checker, "signature", None))
+                          runs, getattr(checker, "signature", None), baseline)
         hit = _reuse(cache, answer_key, refresh_failed, "with_skill_pass")
         if hit:
             for name in ANSWER_FIELDS:
@@ -601,8 +604,15 @@ def run_journeys(root: Path, std: Standard, all_skills: list[Skill], journeys: l
             (res.with_skill_pass, res.with_skill_notes, res.with_skill_answer, res.with_skill_tokens,
              res.with_skill_truncated, res.with_skill_sql) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + context + loaded,
                                                                   j, judge_ep, limit, runs, checker)
+            if baseline:
+                (res.baseline_pass, res.baseline_notes, res.baseline_answer, res.baseline_tokens,
+                 res.baseline_truncated, res.baseline_sql) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + context,
+                                                                  j, judge_ep, limit, runs, checker)
             if cache is not None:
                 cache[answer_key] = {name: getattr(res, name) for name in ANSWER_FIELDS}
+        if res.with_skill_pass and res.baseline_pass:
+            warnings.append(f"journey {j['id']}: passes without any skill too, so it does not test the skills; "
+                            "check something only the skills provide (a helper, a table name, a hand-over)")
         results.append(res)
     return results, warnings
 
@@ -613,14 +623,16 @@ def journeys_markdown(results: list[CaseResult]) -> str:
     lines = ["", "### Journeys", "",
              "Each journey loads all its skills; it shows whether they hand over to each other. Whether Genie Code "
              "loads a skill named in another skill's steps is checked with `skillkit genie-checklist`.", "",
-             "| Journey | Routing to first skill | Answer | Notes |", "| --- | --- | --- | --- |"]
+             "| Journey | Routing to first skill | Answer | Without skills | Notes |", "| --- | --- | --- | --- | --- |"]
     for r in results:
         routing = "-" if r.routing_pass is None else ("pass" if r.routing_pass else "FAIL") + f" ({r.routing_got})"
         answer = "-" if r.with_skill_pass is None else ("pass" if r.with_skill_pass else "FAIL")
         if r.with_skill_pass is None and r.with_skill_truncated:
             answer = "cut off"
         notes = "; ".join(([f"SQL: {r.with_skill_sql}"] if r.with_skill_sql else []) + r.with_skill_notes[:3])
-        lines.append(f"| `{r.case_id}` | {routing} | {answer} | {notes.replace('|', chr(92) + '|')} |")
+        without = "-" if r.baseline_pass is None else ("pass (no effect)" if r.baseline_pass and r.with_skill_pass
+                                                      else "pass" if r.baseline_pass else "FAIL")
+        lines.append(f"| `{r.case_id}` | {routing} | {answer} | {without} | {notes.replace('|', chr(92) + '|')} |")
     return "\n".join(lines) + "\n"
 
 

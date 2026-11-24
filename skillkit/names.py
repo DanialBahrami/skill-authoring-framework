@@ -69,6 +69,8 @@ def candidate(span: str) -> str | None:
     call = CALL_RE.match(span)
     if call:
         return call.group(1)
+    if span.startswith("-") or "://" in span or re.search(r"[=,|\"']", span):
+        return None                    # a CLI flag, a URL, an assignment or a list of values
     if re.search(r"\s", span):
         return None                    # a command, an expression or prose
     return span.rstrip("/")

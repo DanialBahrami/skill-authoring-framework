@@ -42,6 +42,10 @@ STRING_RE = re.compile(r"'(?:[^'\\]|\\.)*'")
 QUALIFIED_RE = re.compile(r"(?<![\w.`])(`?[A-Za-z_][\w-]*`?)\.(`?[\w-]+`?)\.(`?[\w-]+`?)(?![\w.`]|\s*\()")
 DOTTED_RE = re.compile(r"[`\w]+(?:\.[`\w]+){1,2}")
 UNQUALIFIED_RE = re.compile(r"(?i)\b(?:from|join|into|using|update|table)\s+(`?[A-Za-z_]\w*`?)(?![\w`]*\.)(?!\s*\()")
+# Tables a PySpark answer creates: df.write.saveAsTable("..."), writeStream.toTable("..."),
+# DeltaTable.create(spark).tableName("..."), @dlt.table(name="...").
+PY_CREATED_RE = re.compile(r"(?:saveAsTable|toTable|tableName)\(\s*[fr]?([\"'])([^\"']+)\1"
+                           r"|@dlt\.(?:table|view)\([^)]*?name\s*=\s*[fr]?([\"'])([^\"']+)\3", re.S)
 ADDED_COLUMNS_RE = re.compile(r"(?is)\bADD\s+COLUMNS?\s*\(?\s*(.*?)(?:\)\s*$|$)")
 UNRESOLVED_NAME_RE = re.compile(r"UNRESOLVED_(?:COLUMN|FIELD)[^\]]*\][^`]*`([^`]+)`")
 MISSING_NAME_RE = re.compile(r"TABLE_OR_VIEW_NOT_FOUND\].*?(`[^`]+`(?:\.`[^`]+`)*)", re.S)
@@ -205,11 +209,13 @@ class SqlChecker:
             for body in ADDED_COLUMNS_RE.findall(stmt):
                 self._added |= {m.lower() for m in re.findall(r"(?:^|,)\s*`?(\w+)`?\s+[A-Za-z]", body)}
         created: set[str] = set()
-        for stmt in statements:
-            match = CREATE_RE.match(stmt)
-            if match:
-                name = _norm(match.group(1))
-                created |= {name, name.split(".")[-1], ".".join(name.split(".")[-2:])}
+        names = [m.group(1) for m in map(CREATE_RE.match, statements) if m]
+        for lang, body in code_blocks(answer):
+            if lang in ("python", "py", "pyspark", ""):
+                names += [substitute(m.group(2) or m.group(4), self.variables) for m in PY_CREATED_RE.finditer(body)]
+        for raw in names:
+            name = _norm(raw)
+            created |= {name, name.split(".")[-1], ".".join(name.split(".")[-2:])}
 
         def is_new(name: str) -> bool:
             name = _norm(name)

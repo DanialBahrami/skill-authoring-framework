@@ -233,3 +233,68 @@ def test_journey_regex_is_checked(repo: Path):
     (repo / "evals" / "journeys.json").write_text(json.dumps({"journeys": [
         {"id": "j", "prompt": "p", "skills": ["dp-prepare-pr", "dp-prepare-pr"], "must_include": ["(unclosed"]}]}))
     assert any("bad regex" in f.message for f in lint.lint_journeys(repo, load_skills(repo)))
+
+
+def test_tables_created_by_pyspark_are_not_invented():
+    from skillkit.execute import SqlChecker
+
+    def runner(st):
+        if st.startswith("DESCRIBE TABLE") and "contracts_daily" in st:
+            return False, "[TABLE_OR_VIEW_NOT_FOUND] The table or view `dev`.`gold`.`contracts_daily` cannot be found."
+        return True, "== Physical Plan =="
+
+    answer = ('```python\ndf.write.mode("overwrite").saveAsTable(f"{catalog}.gold.contracts_daily")\n'
+              '@dlt.table(name="contracts_stream")\ndef s():\n    return spark.readStream.table("x")\n```\n'
+              "```sql\nSELECT * FROM dev.gold.contracts_daily\n```")
+    report = SqlChecker(runner, {"catalog": "dev"}).check(answer)
+    assert not report.invalid
+
+
+def test_check_names_skips_flags_urls_and_assignments_but_checks_calls(repo: Path, tmp_path: Path, capsys):
+    src = tmp_path / "source"
+    src.mkdir()
+    (src / "lib.py").write_text("def real_helper(df, keys):\n    pass\n")
+    md = repo / "skills" / "dp-prepare-pr" / "SKILL.md"
+    md.write_text(md.read_text().replace("2. Fill", "2. Run with `--runs`, see `https://example.org/x`, set "
+                                         "`load_type=full`, call `real_helper(df, keys)` and `fake_helper(df, keys)`. Fill"))
+    main(["--root", str(repo), "check-names", "--repo", str(src)])
+    report = capsys.readouterr().out.split("\n\n")[0]
+    assert "fake_helper" in report
+    for skipped in ("--runs", "example.org", "load_type", "real_helper"):
+        assert skipped not in report, skipped
+
+
+def test_journey_without_skills_is_reported(repo: Path):
+    from skillkit.evals import load_journeys, run_journeys
+
+    class Easy(FakeLLM):
+        def complete(self, endpoint, system, user, max_tokens):
+            if "select skills" in system:
+                return '{"skill": "dp-prepare-pr"}'
+            return "impact"          # passes with and without skills
+
+    (repo / "evals").mkdir(exist_ok=True)
+    _add_skill(repo, "dp-follow-up", desc="Follows up a PR. Use when the user asks to follow up a pull request.")
+    (repo / "evals" / "journeys.json").write_text(json.dumps({"journeys": [
+        {"id": "easy", "prompt": "Prepare the PR then follow up", "skills": ["dp-prepare-pr", "dp-follow-up"],
+         "must_include": ["impact"]}]}))
+    results, warnings = run_journeys(repo, load_standard(repo), load_skills(repo), load_journeys(repo), Easy(),
+                                     log=lambda *_: None)
+    assert results[0].with_skill_pass and results[0].baseline_pass
+    assert any("passes without any skill" in w for w in warnings)
+
+
+def test_deprecated_target_stays_routable(repo: Path):
+    meta = repo / "skills" / "dp-prepare-pr" / "skill.yaml"
+    meta.write_text(meta.read_text().replace("status: active", "status: deprecated"))
+    seen = []
+
+    class Capture(FakeLLM):
+        def complete(self, endpoint, system, user, max_tokens):
+            if "select skills" in system:
+                seen.append(user)
+            return super().complete(endpoint, system, user, max_tokens)
+
+    skills = load_skills(repo)
+    run_evals(repo, load_standard(repo), skills, skills, Capture(), mode="routing", log=lambda *_: None)
+    assert "dp-prepare-pr" in seen[0].split("User request:")[0]
