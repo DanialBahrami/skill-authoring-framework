@@ -61,7 +61,7 @@ GOOD_EVALS = """{
 def repo(tmp_path: Path) -> Path:
     """A minimal genie-context repo with one valid active skill."""
     shutil.copy(REPO / "standard.yaml", tmp_path / "standard.yaml")
-    shutil.copytree(REPO / "templates", tmp_path / "templates")
+    shutil.copytree(REPO / "context-authoring", tmp_path / "context-authoring")
     (tmp_path / "context").mkdir()
     (tmp_path / "context" / "workspace-instructions.md").write_text("# Workspace\n\n- Rule one.\n")
     skill = tmp_path / "skills" / "dp-prepare-pr"

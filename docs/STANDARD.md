@@ -1,6 +1,6 @@
 # Genie Code context standard
 
-Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` so they can be tuned without editing this file. The README describes the workflow around it.
+Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` so they can be tuned without editing this file. The README describes the meta-skill that drafts this context; `docs/operating.md` describes running it at scale.
 
 ## 1. What goes where
 
