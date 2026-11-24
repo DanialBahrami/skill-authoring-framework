@@ -23,7 +23,7 @@ def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2) -> str:
         "For each skill: install the draft as a personal skill in "
         "`/Workspace/Users/<you>/.assistant/skills/<skill>/` (copy the folder without `skill.yaml` and `evals/`), "
         "start a new Agent-mode thread, open a file in the folder the task belongs to, paste each prompt, "
-        "and tick what you see. "Matches" and "Does not match" are regular expressions.",
+        "and tick what you see. 'Matches' and 'Does not match' are regular expressions.",
         "",
         "Every answer: [ ] the skill was used  [ ] real helpers and conventions, nothing invented  "
         "[ ] no hardcoded catalog, host or path  [ ] asked before anything destructive",
