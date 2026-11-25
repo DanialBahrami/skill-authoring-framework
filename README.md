@@ -53,9 +53,10 @@ Start small: one team and one or two production folders. Run the stages in separ
 Use the context-authoring skill in create mode.
 Source repo: <path>. Folders: <folders>. Team: <team>, skill prefix: <prefix>.
 Docs: <Confluence pages, Markdown folder, or exported pages>.
-Output folder: /Workspace/Users/<you>/genie-skills/
 Do steps 1 to 5 and stop.
 ```
+
+Output goes to `/Workspace/Users/<you>/genie-skills/` unless you add "Output folder: <path>" (a Git folder if changes should go through pull requests). Later runs reuse that folder, so they start from what earlier runs left.
 
 **You: review.** Go through `coverage.md`, `inventory.md` and `conflicts.md` with the [review checkpoint](context-authoring/references/review-checkpoint.md). Fix wrong facts and decide the conflicts; "accept all suggestions except 3 and 7" is enough. This is the most important human step: every skill is built from these three files.
 

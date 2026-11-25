@@ -2,7 +2,19 @@
 
 These are the defaults (`assets/defaults/standard.yaml`). A `standard.yaml` in the output folder overrides the limits, prefixes and sections. The `lint` script enforces most of this; the rest is checked in review, or by hand when the scripts cannot run.
 
-## Folder
+## Output folder
+
+```
+<output folder>/                       the user's choice, or /Workspace/Users/<current user>/genie-skills/
+├── skills/<name>/                     one folder per skill (below)
+├── evals/journeys.json                tasks that chain skills
+├── standard.yaml                      optional overrides of assets/defaults/standard.yaml
+└── authoring/runs/<YYYY-MM-DD>-<scope>/   the run's working files, proposals and summary
+```
+
+Drafts stay here until a person reviews them: copying an approved skill into the workspace skills folder, applying `AGENTS.md` lines, instruction changes and table comments are left to their owners. A Git folder works too, when changes should go through pull requests.
+
+## Skill folder
 
 ```
 skills/<prefix>-<verb>-<object>/
