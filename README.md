@@ -161,11 +161,11 @@ catalog:
 | Output | Router skill, one skill per capability area, "read the router first" instruction | One skill per task; `AGENTS.md`, instructions and table comments for the rest; no router |
 | Conflicts | Recorded in the skills | Decided by people before any skill is written |
 | Teams | One owner, one prefix | Shared conventions, team variants inside a skill, per-team prefixes |
-| Size | Up to about 500 lines per skill | About 200 lines and 2,500 tokens; a catalog budget |
+| Size | Up to about 500 lines per skill | Up to 500 lines and 5,000 tokens per skill (the specification's limit); a catalog budget |
 | Validation | Checklists and a source-blind simulation with sub-agents | Lint, name check, evals with and without each skill on a separate model, optional execution gate |
 | After generation | Regenerate by hand | Per-skill sources and update mode |
 | **Kept from it** | | Signal-by-signal analysis, inventory with sources, vocabularies as term/values/default/consequence, values from config not literals, consent at the risky step, degrees of freedom, leakage scan, symptom-to-fix table, a real-agent check, journeys as a regression suite |
-| **Left out on purpose** | | Capability areas as a skill list (kept as a task checklist), the router and decision trees (a decision is a step with its condition), "Before you start", troubleshooting and related-skills sections (they push skills past the size limit) |
+| **Left out on purpose** | | Capability areas as a skill list (kept as a task checklist), the router and decision trees (a decision is a step with its condition), "Before you start", troubleshooting catalogues and related-skills sections (a skill keeps only a short `## Recovery` table for the failures its own steps can hit) |
 
 ## 9. Running it at scale
 

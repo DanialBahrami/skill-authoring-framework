@@ -14,6 +14,10 @@ def _look_for(case: dict) -> list[str]:
     items = [f"Matches `{p}`" for p in case.get("must_include", []) or []]
     items += [f"Does not match `{p}`" for p in case.get("must_not_include", []) or []]
     items += list(case.get("rubric", []) or [])
+    traj = case.get("trajectory") if isinstance(case.get("trajectory"), dict) else {}
+    if traj.get("order"):
+        items.append("Did these in this order: " + " → ".join(f"`{p}`" for p in traj["order"]))
+    items += [f"Did not: {a}" for a in traj.get("avoid", []) or []]
     return items
 
 
@@ -27,7 +31,8 @@ def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2, journeys
         "For each skill: install the draft as a personal skill in "
         "`/Workspace/Users/<you>/.assistant/skills/<skill>/` (copy the folder without `skill.yaml` and `evals/`), "
         "start a new Agent-mode thread, open a file in the folder the task belongs to, paste each prompt, "
-        "and tick what you see. 'Matches' and 'Does not match' are regular expressions.",
+        "and tick what you see. 'Matches' and 'Does not match' are regular expressions. Judge the trajectory "
+        "from what Genie Code actually read and ran in the thread, not only from its final answer.",
         "",
         "Every answer: [ ] the skill was used  [ ] real helpers and conventions, nothing invented  "
         "[ ] no hardcoded catalog, host or path  [ ] asked before anything destructive",

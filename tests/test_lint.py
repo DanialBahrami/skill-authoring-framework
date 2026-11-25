@@ -62,7 +62,7 @@ def test_sections_required_in_order_and_no_unknown(repo: Path):
 
 def test_body_too_long(repo: Path):
     md = repo / "skills" / "dp-prepare-pr" / "SKILL.md"
-    md.write_text(md.read_text() + "\n".join(f"- line {i}" for i in range(250)))
+    md.write_text(md.read_text() + "\n".join(f"- line {i}" for i in range(550)))
     assert "SK007" in codes(lint.lint_skill(load_skill(md.parent), load_standard(repo)))
 
 
@@ -147,7 +147,8 @@ def _add_skill(repo: Path, name: str, body_extra: str = "", uses=(), status="act
     folder = repo / "skills" / name
     (folder / "evals").mkdir(parents=True)
     import json
-    (folder / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {json.dumps(desc)}\n---\n\n## Steps\n\n1. Do it.{body_extra}\n\n## Verify\n\n- Check.\n")
+    (folder / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {json.dumps(desc)}\n---\n\n## Steps\n\n1. Do it.{body_extra}\n\n## Verify\n\n- Check.\n\n"
+                                       "## Recovery\n\n| Symptom | Cause | Fix |\n| --- | --- | --- |\n| Fails | Bad input | Ask the user |\n")
     (folder / "skill.yaml").write_text(f"owner: {owner}\nstatus: {status}\nlast_reviewed: 2026-11-01\n"
                                        f"sources:\n  - note: test\nuses: [{', '.join(uses)}]\n")
     from conftest import GOOD_EVALS

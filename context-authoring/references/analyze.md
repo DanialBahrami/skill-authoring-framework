@@ -51,7 +51,7 @@ In a large repo you will not read everything, and that is fine as long as it is 
 | Onboarding guides, "how we do X" pages, runbooks | Tasks and their steps as the team describes them; compare with the code |
 | Architecture and layer pages | Vocabulary (layers, zones, environments), contract rules |
 | Decision records, standards pages | Rules with their reasons; the reason becomes the one line of reasoning in a skill |
-| Troubleshooting pages, incident write-ups, FAQ | Gotchas and failure fixes |
+| Troubleshooting pages, incident write-ups, FAQ, error handling in the code | Gotchas, and the `## Recovery` rows of a skill: the failures its steps hit and what to do about them |
 | Pages that describe something the code no longer does | A docs-vs-code conflict, not a fact |
 
 Record every page you read in the "Docs read" table of `coverage.md`: its id and version (so the next run sees whether it changed), whether it is useful or thin (empty, only links or headings, outdated), and whether it contradicts the code. That list tells page owners what to fix first.

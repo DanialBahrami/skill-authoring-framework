@@ -9,7 +9,11 @@
       "must_not_include": ["TODO: a hardcoded environment value"],
       "exec_new_tables": ["TODO: regex of a table the task creates, e.g. crm_contracts"],
       "exec_new_columns": ["TODO: a column the task adds through a template, e.g. contract_end_date"],
-      "assertions": ["TODO: the table or parameter one skill produces is the one the next skill uses"]
+      "assertions": ["TODO: the table or parameter one skill produces is the one the next skill uses"],
+      "trajectory": {
+        "order": ["TODO: regex of a step from the first skill", "TODO: regex of a step from the skill it hands over to"],
+        "avoid": ["TODO: a wrong path, e.g. Searches the repo for how the next step is done"]
+      }
     }
   ]
 }
