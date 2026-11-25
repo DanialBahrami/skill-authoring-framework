@@ -1,48 +1,47 @@
-# Inventory: <scope>
+# Inventory: {{scope}}
 
-Run: <YYYY-MM-DD>-<scope> · Source repo: <name> · Folders: <paths> · Team: <team> (<prefix>)
+Run: {{run}} · Source repo: <name> · Folders: <paths> · Team: <team> (<prefix>) · Docs: <where>
 
-Every fact has a source: a repo path (`path/to/file`), a Confluence page id, or `note:` with who said it. Code wins over docs; record disagreements in conflicts.md.
+What this run is based on. Every row has a source: a repo path, a doc page id, a search command, or `note:` with who said it. Read code before docs; where they disagree, the code is the current state and the difference goes to `decisions.md`. How to fill each table: `references/analyze.md`.
+
+## Coverage
+
+Kind: production · shared library · team-owned · tooling · ad hoc · archive · generated.
+Read: all · sampled (which files) · searched (the command) · names only · skipped.
+Take conventions and examples only from production, shared library, team-owned and tooling folders. A folder read by names only, or skipped, produces no skill in this run: its tasks go to the backlog in `report.md`.
+
+| Folder | Files | Kind | Owner | Read | Notes |
+| --- | --- | --- | --- | --- | --- |
+
+### Docs read
+
+| Page or file | Id and version | Useful? | Contradicts the code? |
+| --- | --- | --- | --- |
 
 ## Tasks people repeat
 
-| Task (verb + object) | Who does it | How often | Asked for on its own? | Sub-steps (short names, reused across tasks) | Sources |
+Named in the team's words ("onboard a source table", not "PySpark"). "On its own" decides what becomes a separate skill: a sub-step people also ask for by itself.
+
+| Task (verb + object) | Who does it | Sub-steps, in order | Sub-steps asked for on their own | Sources |
+| --- | --- | --- | --- | --- |
+
+## Helpers and templates
+
+The consumer will not read these files: the skill carries the signature, and every template the task copies goes into the skill's `assets/`. Template: **copy to assets** (the original goes in `sources`) · **build an asset** (no template exists, people repeat the same shape) · **none**.
+
+| Name | Signature or usage | What it guarantees | Template | Source |
+| --- | --- | --- | --- | --- |
+
+## Vocabularies
+
+What an agent guesses wrong. "Goes with" lists values that require, or exclude, each other.
+
+| Term | Values | Default | Consequence of a wrong value | Goes with | Source |
 | --- | --- | --- | --- | --- | --- |
 
-## Shared material
+## Facts
 
-Anything that appears in two or more tasks: a sub-step, a rule, a vocabulary. Decide in this order; the first yes wins.
+Conventions, config, guardrails, gotchas: what the consumer would otherwise dig out of the code. "Needed by" lists the tasks that need it; a fact two or more tasks need is shared material (`references/analyze.md`). Layer: `skill:<name>` · `agents-md:<path>` · `instructions` · `catalog-comment` · `script:<skill>` · `drop`.
 
-1. Is it a rule, convention or vocabulary? -> `AGENTS.md` (or workspace instructions if it must hold outside the repo).
-2. Is it a task people also ask for on its own? -> its own skill; the other skills name it at the step that needs it.
-3. Otherwise -> keep it inside each skill that needs it. A few repeated lines cost less than a skill that must always load alongside.
-
-| Shared item | Appears in tasks | Rule / convention? | Asked for on its own? | Decision |
+| Fact | Kind | Needed by | Layer | Source |
 | --- | --- | --- | --- | --- |
-
-## Shared helpers and templates
-
-Template decision (see `references/writing-skills.md`, "Assets"): **in repo** (the skill names it by path), **copy to assets** (the task can start outside the repo), **build asset** (no template exists, people repeat the same shape), **none**.
-
-| Name | Signature / usage | What it guarantees | Template decision | Source |
-| --- | --- | --- | --- | --- |
-
-## Vocabulary
-
-| Term | Values | Default | Consequence of a wrong value | Source |
-| --- | --- | --- | --- | --- |
-
-## Config, metadata and environments
-
-| Item | Where it lives | How it is derived | Source |
-| --- | --- | --- | --- |
-
-## Guardrails and process
-
-| Rule | Why | Source |
-| --- | --- | --- |
-
-## Folders and owners
-
-| Folder | Team | Differs from the platform way? | Source |
-| --- | --- | --- | --- |

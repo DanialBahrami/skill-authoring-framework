@@ -1,6 +1,7 @@
 """Eval runner: routing test, answer test with and without the skill (baseline), LLM judge.
 
-The runner simulates Genie Code with a model serving endpoint. It does not execute
+The runner simulates the consumer agent (`workspace.consumer` in standard.yaml) with a model serving
+endpoint. It does not execute
 anything in the workspace: the model describes what it would do, in order, and the answer is
 scored with regexes and a rubric judged by a second model. A case's `trajectory` checks the
 described path as well as the result: `order` regexes must appear in that order, and the
@@ -48,12 +49,12 @@ import yaml
 
 from .model import Skill, Standard, defaults_dir, instructions_for_evals
 
-ROUTER_SYSTEM = """You select skills for Genie Code, the Databricks coding agent.
+ROUTER_SYSTEM = """You select skills for a coding agent.
 You get a user request and the list of installed skills (name: description).
 Return the single skill that should be loaded first to handle the request, or "none"
 if no skill fits. Answer with JSON only: {"skill": "<name or none>"}"""
 
-AGENT_SYSTEM = """You are Genie Code in Agent mode in a Databricks workspace.
+AGENT_SYSTEM = """You are {consumer}.
 In this test you cannot run anything. Describe exactly what you would do, in the order you
 would do it: anything you would read or look up first (files, tables, docs), the files you
 would create or change with their content, the SQL and code you would run, how you would
@@ -70,6 +71,14 @@ a value of that shape. An item that starts with "Avoids:" names an action the ag
 take: it passes only if the answer neither does nor plans that action, including as a first
 step to gather information. Answer with JSON only:
 {"items": [{"item": "<rubric item>", "pass": true|false, "reason": "<short>"}]}"""
+
+
+DEFAULT_CONSUMER = "a coding agent working in this organisation's repositories"
+
+
+def agent_system(std: Standard) -> str:
+    """The answer prompt for the agent under test, named by `workspace.consumer` in standard.yaml."""
+    return AGENT_SYSTEM.format(consumer=std.workspace.get("consumer") or DEFAULT_CONSUMER)
 
 
 class LLM(Protocol):
@@ -347,6 +356,7 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
     runs = max(1, int(runs))
     by_name = {s.name: s for s in all_skills}
     warnings: list[str] = []
+    system = agent_system(std)
 
     catalog_text = catalog_for_routing(root, all_skills, installed, {t.name for t in targets})
     pattern = re.compile(case_filter) if case_filter else None
@@ -404,7 +414,7 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
                 with_skill = f"{base_context}\n\n# Skill loaded: {skill.name}\n{skill.reference_text()}"
                 limit = skill.eval_max_tokens or max_tokens
                 res.max_tokens = limit
-                answer_key = _key("answer", model, judge_ep, AGENT_SYSTEM, JUDGE_SYSTEM, with_skill, base_context,
+                answer_key = _key("answer", model, judge_ep, system, JUDGE_SYSTEM, with_skill, base_context,
                                   case, limit, runs, baseline, getattr(checker, "signature", None))
                 hit = _reuse(cache, answer_key, refresh_failed, "with_skill_pass")
                 if hit:
@@ -414,11 +424,11 @@ def run_evals(root: Path, std: Standard, all_skills: list[Skill], targets: list[
                     results.append(res)
                     continue
                 (res.with_skill_pass, res.with_skill_notes, res.with_skill_answer, res.with_skill_tokens,
-                 res.with_skill_truncated, res.with_skill_sql) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + with_skill,
+                 res.with_skill_truncated, res.with_skill_sql) = _arm(llm, model, system + "\n\n" + with_skill,
                                                                       case, judge_ep, limit, runs, checker)
                 if baseline:
                     (res.baseline_pass, res.baseline_notes, res.baseline_answer, res.baseline_tokens,
-                     res.baseline_truncated, res.baseline_sql) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + base_context,
+                     res.baseline_truncated, res.baseline_sql) = _arm(llm, model, system + "\n\n" + base_context,
                                                                       case, judge_ep, limit, runs, checker)
                 if cache is not None:
                     cache[answer_key] = {name: getattr(res, name) for name in ANSWER_FIELDS}
@@ -519,6 +529,7 @@ def run_context_evals(root: Path, std: Standard, cases_file: Path, llm: LLM, *, 
     judge_ep = std.eval.get("judge_endpoint", model)
     max_tokens = int(std.eval.get("max_tokens", 2000))
     text, _ = instructions_for_evals(root)
+    system = agent_system(std)
     base = f"# Workspace instructions\n{text}" if text else ""
     results, warnings = [], []
     for raw in data.get("evals", []):
@@ -530,7 +541,7 @@ def run_context_evals(root: Path, std: Standard, cases_file: Path, llm: LLM, *, 
         context, warn = _context_block(root, case, repos_root, drafts_root)
         warnings += warn
         for arm, ctx in (("with", context), ("without", base)):
-            ok, notes, answer, tokens, cuts, sql = _arm(llm, model, AGENT_SYSTEM + "\n\n" + ctx, case, judge_ep,
+            ok, notes, answer, tokens, cuts, sql = _arm(llm, model, system + "\n\n" + ctx, case, judge_ep,
                                                         max_tokens, max(1, runs), checker)
             if arm == "with":
                 (res.with_skill_pass, res.with_skill_notes, res.with_skill_answer, res.with_skill_tokens,
@@ -582,14 +593,15 @@ def run_journeys(root: Path, std: Standard, all_skills: list[Skill], journeys: l
     """Run each journey: routing must pick its first skill; the answer, with every skill of the
     journey loaded, must pass its checks. With `baseline`, the journey also runs without any skill:
     if it passes then too, its checks do not test the skills (reported, not failed). This tests that the skills hand over to each other
-    (names, tables and parameters line up). It cannot test whether Genie Code loads a skill
-    named in another skill's steps; the Genie Code checklist covers that."""
+    (names, tables and parameters line up). It cannot test whether the agent loads a skill
+    named in another skill's steps; the agent checklist covers that."""
     model = std.eval.get("model_endpoint")
     judge_ep = std.eval.get("judge_endpoint", model)
     threshold = float(threshold if threshold is not None else std.eval.get("trigger_threshold", 0.5))
     runs = max(1, int(runs))
     by_name = {s.name: s for s in all_skills}
     catalog_text = catalog_for_routing(root, all_skills, installed)
+    system = agent_system(std)
     results, warnings = [], []
     for j in journeys:
         missing = [n for n in j["skills"] if n not in by_name]
@@ -624,7 +636,7 @@ def run_journeys(root: Path, std: Standard, all_skills: list[Skill], journeys: l
         context, warn = _context_block(root, j, repos_root, drafts_root)
         warnings += warn
         loaded = "".join(f"\n\n# Skill loaded: {s.name}\n{s.reference_text()}" for s in skills)
-        answer_key = _key("journey-answer", model, judge_ep, AGENT_SYSTEM, JUDGE_SYSTEM, context, loaded, j, limit,
+        answer_key = _key("journey-answer", model, judge_ep, system, JUDGE_SYSTEM, context, loaded, j, limit,
                           runs, getattr(checker, "signature", None), baseline)
         hit = _reuse(cache, answer_key, refresh_failed, "with_skill_pass")
         if hit:
@@ -633,11 +645,11 @@ def run_journeys(root: Path, std: Standard, all_skills: list[Skill], journeys: l
         else:
             res.max_tokens = limit
             (res.with_skill_pass, res.with_skill_notes, res.with_skill_answer, res.with_skill_tokens,
-             res.with_skill_truncated, res.with_skill_sql) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + context + loaded,
+             res.with_skill_truncated, res.with_skill_sql) = _arm(llm, model, system + "\n\n" + context + loaded,
                                                                   j, judge_ep, limit, runs, checker)
             if baseline:
                 (res.baseline_pass, res.baseline_notes, res.baseline_answer, res.baseline_tokens,
-                 res.baseline_truncated, res.baseline_sql) = _arm(llm, model, AGENT_SYSTEM + "\n\n" + context,
+                 res.baseline_truncated, res.baseline_sql) = _arm(llm, model, system + "\n\n" + context,
                                                                   j, judge_ep, limit, runs, checker)
             if cache is not None:
                 cache[answer_key] = {name: getattr(res, name) for name in ANSWER_FIELDS}
@@ -652,8 +664,8 @@ def journeys_markdown(results: list[CaseResult]) -> str:
     if not results:
         return ""
     lines = ["", "### Journeys", "",
-             "Each journey loads all its skills; it shows whether they hand over to each other. Whether Genie Code "
-             "loads a skill named in another skill's steps is checked with `skillkit genie-checklist`.", "",
+             "Each journey loads all its skills; it shows whether they hand over to each other. Whether the agent "
+             "loads a skill named in another skill's steps is checked with `skillkit agent-checklist`.", "",
              "| Journey | Routing to first skill | Answer | Without skills | Notes |", "| --- | --- | --- | --- | --- |"]
     for r in results:
         routing = "-" if r.routing_pass is None else ("pass" if r.routing_pass else "FAIL") + f" ({r.routing_got})"

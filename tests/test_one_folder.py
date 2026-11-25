@@ -127,3 +127,13 @@ def test_dry_run_from_an_installed_copy(tmp_path: Path):
     assert ev.returncode == 0, ev.stdout + ev.stderr
     verdicts = json.loads((output / "eval.json").read_text())["verdicts"]
     assert verdicts[0]["verdict"] == "ADDS VALUE"
+
+    # A whole run from the installed copy: init from its templates, then check the drafts.
+    start = run("init", "--scope", "pr")
+    assert start.returncode == 0, start.stderr
+    folder = next((output / "authoring" / "runs").iterdir())
+    assert {p.name for p in folder.iterdir()} == {"inventory.md", "decisions.md", "proposals.md", "report.md"}
+    done = run("check", str(folder), "--repo", str(source), "--runs", "1")
+    assert done.returncode == 0, done.stdout + done.stderr
+    report = (folder / "report.md").read_text()
+    assert "## For you to review" in report and "**ADDS VALUE**" in report and "### Agent check" in report

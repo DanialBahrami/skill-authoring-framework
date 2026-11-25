@@ -1,7 +1,7 @@
-"""Generate the Genie Code check: prompts to paste and what to look for, per skill.
+"""Generate the agent check: prompts to paste into the real agent and what to look for, per skill.
 
-Evals call a model through a serving endpoint, not Genie Code itself. This checklist makes
-the manual check in a real Agent-mode thread quick enough that it gets done.
+Evals call a model through a serving endpoint, not the agent itself. This checklist makes the
+manual check in a real agent session quick enough that it gets done.
 """
 
 from __future__ import annotations
@@ -21,18 +21,20 @@ def _look_for(case: dict) -> list[str]:
     return items
 
 
-READ_FILES = "- [ ] Read repo files to answer? no / yes: ____ (if yes, did the skill or the repo do the work?)"
+READ_FILES = ("- [ ] Read repo files to answer? no / yes: ____ (if yes, the skill is missing what the agent went "
+              "looking for: add it to the skill)")
 
 
-def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2, journeys: list[dict] | None = None) -> str:
+def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2, journeys: list[dict] | None = None,
+                       install_path: str = "<your personal skills folder>") -> str:
     lines = [
-        "# Genie Code check",
+        "# Agent check",
         "",
         "For each skill: install the draft as a personal skill in "
-        "`/Workspace/Users/<you>/.assistant/skills/<skill>/` (copy the folder without `skill.yaml` and `evals/`), "
-        "start a new Agent-mode thread, open a file in the folder the task belongs to, paste each prompt, "
+        f"`{install_path.rstrip('/')}/<skill>/` (copy the folder without `skill.yaml` and `evals/`), "
+        "start a new agent session, open a file in the folder the task belongs to, paste each prompt, "
         "and tick what you see. 'Matches' and 'Does not match' are regular expressions. Judge the trajectory "
-        "from what Genie Code actually read and ran in the thread, not only from its final answer.",
+        "from what the agent actually read and ran in the session, not only from its final answer.",
         "",
         "Every answer: [ ] the skill was used  [ ] real helpers and conventions, nothing invented  "
         "[ ] no hardcoded catalog, host or path  [ ] asked before anything destructive",
@@ -42,7 +44,7 @@ def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2, journeys
         triggers = [c for c in skill.cases if c.get("type", "trigger") == "trigger"][:prompts_per_skill]
         lines += [f"## {skill.name}", ""]
         if skill.uses:
-            lines += [f"Uses {', '.join(f'`{u}`' for u in skill.uses)}: check that Genie Code also follows "
+            lines += [f"Uses {', '.join(f'`{u}`' for u in skill.uses)}: check that the agent also follows "
                       "those skills at the step that names them.", ""]
         if not triggers:
             lines += ["No trigger cases in `evals/evals.json`; add two before checking.", ""]
@@ -60,7 +62,7 @@ def checklist_markdown(skills: list[Skill], prompts_per_skill: int = 2, journeys
         lines += ["Result: [ ] passes  [ ] needs work: ____________________", ""]
     if journeys:
         lines += ["## Journeys", "",
-                  "Tasks that span several skills. This is the only check of whether Genie Code loads a skill named "
+                  "Tasks that span several skills. This is the only check of whether the agent loads a skill named "
                   "in another skill's steps: the simulated evals load them all up front.", ""]
         for j in journeys:
             lines += [f"**{j['id']}**", "", "```text", j["prompt"], "```", ""]

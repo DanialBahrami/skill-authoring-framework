@@ -314,3 +314,12 @@ def test_deprecated_target_stays_routable(repo: Path):
     skills = load_skills(repo)
     run_evals(repo, load_standard(repo), skills, skills, Capture(), mode="routing", log=lambda *_: None)
     assert "dp-prepare-pr" in seen[0].split("User request:")[0]
+
+
+def test_agent_checklist_uses_the_install_path_from_the_settings(repo: Path, tmp_path: Path):
+    (repo / "standard.yaml").write_text((repo / "standard.yaml").read_text().replace(
+        "workspace:\n", "workspace:\n  personal_skills_path: ~/.claude/skills\n"))
+    out = tmp_path / "check.md"
+    assert main(["--root", str(repo), "agent-checklist", "--out", str(out)]) == 0
+    text = out.read_text()
+    assert text.startswith("# Agent check") and "`~/.claude/skills/<skill>/`" in text and "Genie" not in text

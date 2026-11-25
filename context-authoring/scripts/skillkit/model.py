@@ -305,7 +305,7 @@ def workspace_instructions_path(root: Path) -> Path:
 
 def instructions_for_evals(root: Path) -> tuple[str, str]:
     """(text, where) of the workspace instructions evals should inject: the Git copy when the output
-    folder has one (it is what will be deployed), otherwise the live file Genie Code loads."""
+    folder has one (it is what will be deployed), otherwise the live file the agent loads."""
     copy = workspace_instructions_path(root)
     if copy.is_file():
         return copy.read_text(encoding="utf-8"), copy.as_posix()

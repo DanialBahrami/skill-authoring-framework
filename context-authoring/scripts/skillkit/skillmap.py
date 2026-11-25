@@ -21,8 +21,8 @@ def load_verdicts(path: Path | None) -> dict[str, str]:
 
 
 def planned_changes(path: Path | None) -> dict[str, str]:
-    """The "This run" column of a planned skill-map.md (new / updated / variant added / unchanged),
-    so the generated map keeps what the run decided at Map."""
+    """The "This run" column of a planned family table (decisions.md: new / updated / variant added / unchanged),
+    so the generated map keeps what the run decided."""
     if not path or not path.is_file():
         return {}
     header: list[str] | None = None

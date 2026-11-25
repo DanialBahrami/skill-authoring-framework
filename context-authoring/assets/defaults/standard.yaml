@@ -13,7 +13,7 @@ prefixes: {}
 
 # Limits. Body and description limits follow the Agent Skills specification (descriptions up
 # to 1024 characters, bodies under 500 lines / 5000 tokens). The catalog budget is what keeps
-# a shared workspace cheap: every active description is paid in every Agent-mode session.
+# a shared workspace cheap: every active description is paid in every agent session.
 limits:
   description_min_chars: 80
   description_max_chars: 1024
@@ -27,6 +27,10 @@ limits:
   agents_md_max_lines: 500
 
 review_period_days: 120
+
+# When people review a run: "end" (the meta-skill runs every step, people review report.md) or
+# "before-write" (it stops after deciding, for a review of inventory.md and decisions.md).
+review: end
 
 # Section headings allowed in a SKILL.md body. Required ones must appear in this order.
 sections:
@@ -65,10 +69,15 @@ forbidden_patterns_context:
   - name: secret-looking token
     regex: '\bdapi[0-9a-f]{32}\b'
 
+# The platform the skills are for. The meta-skill's text names no agent or platform; these values do.
+# The defaults are for Databricks Genie Code; change them for another agent.
 workspace:
-  skills_path: /Workspace/.assistant/skills
-  instructions_path: /Workspace/.assistant_workspace_instructions.md
-  manifest_path: /Workspace/.assistant/genie-context-manifest.json   # deployed commit + checksums
+  consumer: Genie Code in Agent mode in a Databricks workspace     # the agent under test, as evals describe it
+  output_folder: /Workspace/Users/<current user>/genie-skills       # where a run writes when the user names no folder
+  personal_skills_path: /Workspace/Users/<you>/.assistant/skills   # where a person installs a draft to try it
+  skills_path: /Workspace/.assistant/skills                        # where active skills are deployed (ops)
+  instructions_path: /Workspace/.assistant_workspace_instructions.md   # the always-on instructions file
+  manifest_path: /Workspace/.assistant/genie-context-manifest.json   # deployed commit + checksums (ops)
 
 eval:
   model_endpoint: databricks-claude-sonnet-4-5
@@ -76,7 +85,9 @@ eval:
   # a same-model judge tends to be lenient.
   judge_endpoint: databricks-gpt-oss-120b
   max_tokens: 2000
+  runs: 3                    # runs per case in `check` (`eval --runs` overrides it)
   trigger_threshold: 0.5     # routing passes when the trigger rate over --runs reaches this
+  # repos_root: /Workspace/Users/<you>/repos   # folder with source repo checkouts, for the AGENTS.md files cases list
   # Execution gate (skillkit eval --execute): SQL in answers is planned with EXPLAIN on a development
   # SQL warehouse. Run it as an identity that can only read the development catalog.
   # execution:

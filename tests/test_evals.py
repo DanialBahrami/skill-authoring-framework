@@ -109,3 +109,22 @@ def test_context_evals(repo: Path, tmp_path: Path):
 
     results, summary, _ = run_context_evals(repo, load_standard(repo), cases, Echo(), repos_root=tmp_path / "repos")
     assert summary.verdict == "ADDS VALUE" and results[0].with_skill_pass and not results[0].baseline_pass
+
+
+def test_the_agent_under_test_comes_from_the_settings(repo: Path):
+    from skillkit.evals import agent_system
+
+    std = load_standard(repo)
+    assert agent_system(std).startswith("You are Genie Code in Agent mode in a Databricks workspace.")
+    std.raw["workspace"]["consumer"] = "Claude Code in a developer's checkout"
+    assert agent_system(std).startswith("You are Claude Code in a developer's checkout.")
+    seen = []
+
+    class Capture(FakeLLM):
+        def complete(self, endpoint, system, user, max_tokens):
+            seen.append(system)
+            return super().complete(endpoint, system, user, max_tokens)
+
+    run_evals(repo, std, load_skills(repo), load_skills(repo), Capture(), mode="answer", log=lambda *_: None)
+    answers = [s for s in seen if "Skill loaded" in s or "Workspace instructions" in s]
+    assert answers and all(s.startswith("You are Claude Code") for s in answers)
