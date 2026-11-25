@@ -9,7 +9,11 @@
       "agents": [],
       "must_include": [],
       "must_not_include": [],
-      "assertions": ["TODO: an observable result, e.g. Uses the X template instead of writing a MERGE by hand"]
+      "assertions": ["TODO: an observable result, e.g. Uses the X template instead of writing a MERGE by hand"],
+      "trajectory": {
+        "order": ["TODO: regex of an early step, e.g. bundle validate", "TODO: regex of a later step, e.g. bundle deploy"],
+        "avoid": ["TODO: a wrong path, e.g. Reads repository files to look up the naming convention"]
+      }
     },
     {
       "id": "trigger-02",

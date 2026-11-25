@@ -6,6 +6,7 @@ The output contract says what a skill must contain. This file is about writing i
 
 - Description
 - Steps
+- Checks and recovery
 - Decisions
 - How exact to be
 - Risky steps
@@ -31,6 +32,26 @@ It decides whether the skill loads; nothing else in the skill matters if it does
 - Add one line of reasoning only where the step differs from what the agent would do by default. "Use `merge_table_silver`: it adds the audit columns and deduplicates on the business key" lets the agent handle cases the skill did not foresee; a bare "use `merge_table_silver`" does not.
 - Inline what the step needs (helper signature, parameter names, the convention), copied from the source. Never send the agent to read a file or page for it.
 - Name another skill at the step that needs it, with what to pass, and list it in `uses`.
+
+## Checks and recovery
+
+Generated skills tend to describe only the happy path. When a step fails, the agent improvises: it retries, wastes turns, or "fixes" the problem in a way nobody would accept, such as creating the table in a schema where it does have rights.
+
+- A step that runs something (a command, SQL, a deploy, a script) ends with `Check:` and the observable result that means it worked: an exit code, a `DESCRIBE TABLE` with the expected columns, the job in `databricks bundle summary`. The agent checks before the next step, so a failure is caught where it happens, not three steps later.
+- `## Verify` is still the end-to-end check before reporting back; `Check:` lines are per step.
+- `## Recovery` is a table of the failures the steps can realistically hit, with cause and fix. Take the rows from error handling in the code, troubleshooting pages, incident write-ups and repeated review comments; never invent failures to fill the table.
+- A fix says what to change, or when to stop and what to tell the user. "Try again" is not a fix. Where improvising would do harm (permissions, an existing table, production), the fix is to stop and ask.
+- Keep it to the steps' own failures, usually three to six rows. A long troubleshooting guide is a reference file linked from the row that needs it.
+
+```
+## Recovery
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `PERMISSION_DENIED` on CREATE TABLE | The principal lacks a grant on the schema | Stop and tell the user which grant is missing; never create the table in another schema |
+| `variable catalog is not defined` | No bundle target given | Rerun with `-t dev` |
+| The table exists with a different schema | An earlier onboarding failed half-way | Stop and report the difference; do not drop the table |
+```
 
 ## Decisions
 
@@ -105,7 +126,7 @@ Add a script to `scripts/` only for deterministic work the agent would otherwise
 
 ## Before and after
 
-From a fictional repo. Before (generic, points elsewhere, no reasons):
+From a fictional repo. Before (generic, points elsewhere, no reasons, no checks):
 
 ```
 ## Steps
@@ -114,7 +135,7 @@ From a fictional repo. Before (generic, points elsewhere, no reasons):
 3. Make sure PII is handled correctly.
 ```
 
-After (distilled, with the default, the reason and the guard):
+After (distilled, with the default, the reason, the guard and the checks):
 
 ```
 ## Steps
@@ -122,4 +143,5 @@ After (distilled, with the default, the reason and the guard):
 2. Merge with `merge_table_silver(df, target, keys=[business_key])`: it deduplicates on the key and adds `_loaded_at` and `_source_file`; do not write a MERGE by hand.
 3. Tag every PII column with `pii` and the PII type as value (`email`, `phone`); untagged PII columns are not masked downstream.
 4. Run the notebook in development only; production changes go through the release pipeline.
+   Check: `DESCRIBE TABLE` on the target lists `_loaded_at` and `_source_file`, and the PII columns carry the `pii` tag.
 ```

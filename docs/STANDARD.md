@@ -27,13 +27,13 @@ A skill is justified only when all three hold:
 
 | Level | When it costs | Budget |
 |---|---|---|
-| Workspace instructions | Every response, every user | About 1,500 tokens; Databricks ignores text past 20,000 characters |
-| Skill name and description | Every Agent-mode session, for every installed skill | 80–600 characters each; about 2,500 tokens for the whole catalog |
-| `SKILL.md` body | Each time the skill triggers | 200 lines and about 2,500 tokens |
-| `AGENTS.md` | When a file in its folder is open | 300 lines |
+| Workspace instructions | Every response, every user | About 4,000 tokens; Databricks ignores text past 20,000 characters |
+| Skill name and description | Every Agent-mode session, for every installed skill | 80–1,024 characters each; about 10,000 tokens for the whole catalog |
+| `SKILL.md` body | Each time the skill triggers | 500 lines and about 5,000 tokens |
+| `AGENTS.md` | When a file in its folder is open | 500 lines |
 | `references/`, `scripts/`, `assets/` | Only when opened or run | No limit; files over 100 lines start with a `## Contents` list |
 
-Token counts are estimated as characters / 4.
+Token counts are estimated as characters / 4. Body and description limits are the Agent Skills specification's; the catalog budget is ours, because every active description is paid in every session. The limits are ceilings, not targets: the evals show whether extra text helps, and less text often works better as models improve.
 
 - **No runtime reads of static knowledge.** A skill must not tell the agent to browse a repository, wiki or MCP server for conventions. Distil the convention at authoring time and record the source in `skill.yaml`. Runtime lookups are for live state only.
 - **Detail goes down a level.** Long tables, templates and edge cases go in `references/` or `assets/`, linked from the body with a note on when to open them.
@@ -62,12 +62,14 @@ skills/<name>/
 `name` and `description` are required. The specification's optional fields (`license`, `compatibility`, `metadata`) are allowed; nothing else.
 
 - `name`: `<team-prefix>-<verb>-<object>`, lowercase with single hyphens, equal to the folder name, at most 64 characters. Prefixes are registered in `standard.yaml`. Example: `dp-onboard-source-table`.
-- `description`: 80–600 characters (the specification allows 1,024; every description is paid in every session), third person, says what the skill does and then when to use it. It contains "Use when" followed by the situations and the terms people actually type. When a neighbouring skill shares vocabulary, end with what this one is not for. This field alone decides whether the skill triggers.
+- `description`: 80–1,024 characters (every description is paid in every session, so aim for a few hundred), third person, says what the skill does and then when to use it. It contains "Use when" followed by the situations and the terms people actually type. When a neighbouring skill shares vocabulary, end with what this one is not for. This field alone decides whether the skill triggers.
 
 ### Body
 
-Required sections, in this order: `## Steps` (numbered, imperative) and `## Verify` (how the agent confirms the result before reporting back). Optional: `## Gotchas` (facts that defy reasonable assumptions), `## Rules`, `## Examples`, `## References`. No other sections.
+Required sections, in this order: `## Steps` (numbered, imperative), `## Verify` (how the agent confirms the whole result before reporting back) and `## Recovery` (what to do when a step fails). Optional: `## Gotchas` (facts that defy reasonable assumptions), `## Rules`, `## Examples`, `## References`. No other sections.
 
+- Each step has one objective. A step that runs something (a command, SQL, a deploy) ends with a `Check:` line saying how the agent confirms that step worked before it moves on. `## Verify` checks the end result; `Check:` lines catch a failure where it happens.
+- `## Recovery` is a table: symptom, cause, fix. It lists the failures the steps can realistically hit (permission errors, missing variables, a target that already exists) and what to do, including when to stop and ask the user. "Try again" is not a fix. Long troubleshooting material goes in a reference file.
 - State only what differs from default Databricks practice, with one line of reasoning per rule.
 - One default per decision. An alternative appears only with the condition that selects it.
 - Never hardcode environment-specific values (catalogs, workspace URLs, IDs, emails, secrets). Refer to bundle variables, widgets or the environment table in the workspace instructions.
@@ -81,6 +83,13 @@ Required sections, in this order: `## Steps` (numbered, imperative) and `## Veri
 
 Each skill carries `evals/evals.json` with at least two `trigger` cases and one `near_miss` case; more are expected for active skills (the Agent Skills guide suggests about 20 trigger queries, half near misses). Trigger cases state observable results with `must_include`, `must_not_include` and `assertions`; cases list the `AGENTS.md` files Genie Code would have loaded.
 
+Trigger cases also check the path to the answer, not only the answer, with a `trajectory`:
+
+- `order`: regexes that must appear in the answer in this order (validate before deploy, a read-only check before a write).
+- `avoid`: actions the agent must not take on the way, judged by the judge model ("reads repository files to look up the naming convention", "creates the table in another schema").
+
+A right answer reached the wrong way still costs tokens or luck: an agent that reads half the repo to find a convention passes an answer-only check. At least one trigger case per skill has a trajectory; the linter warns otherwise.
+
 `skillkit eval` runs, for every case and `--runs` times: a routing test (the model sees every skill in the output folder that is not deprecated, drafts included, optionally the skills installed in the workspace, plus decoys for built-in skills, and picks a skill; passes on a trigger rate of 0.5; only the skills named are scored), and for trigger cases an answer test with the skill and without it (passes on a majority of runs). Skills in `uses` are available in both arms, so a workflow is measured against its building blocks. The report shows the extra tokens per answer the skill costs. The verdict per skill:
 
 - **ADDS VALUE**: every case passes, and at least one passes only with the skill. Required to merge.
@@ -88,11 +97,11 @@ Each skill carries `evals/evals.json` with at least two `trigger` cases and one 
 - **FAILING**: a routing or answer case fails.
 - **INCONCLUSIVE**: answers were cut off at the token limit; raise `eval: max_tokens` in `skill.yaml` and run again.
 
-Every expected behaviour in a case must be achievable without running anything: the model describes what it would do.
+Every expected behaviour in a case must be achievable without running anything: the model describes what it would do, in order, including what it would read first. The trajectory is therefore checked on the described plan; the Genie Code check below is where the real one is seen.
 
 With a development SQL warehouse or a notebook's Spark session, `--execute` adds an execution gate: the SQL in each answer is planned with `EXPLAIN`, tables in the development catalog get `DESCRIBE TABLE`, and Python and YAML blocks are syntax-checked; anything that fails fails the run. Only `EXPLAIN` and `DESCRIBE TABLE` are sent. Evals inject the workspace instructions Genie Code would load: the live file, or the context repo's Git copy when there is one. A skill that uses other skills has a journey in `evals/journeys.json`, a task that needs the whole chain; `skillkit eval` runs the journeys that involve the skills it evaluates.
 
-The PR pipeline runs this for changed skills (3 runs) and, for coexistence, the routing test for every active skill, and posts the report on the PR. During the pilot the eval gate is advisory; it becomes blocking once the suite is stable. Before activating a new skill, the author also runs two cases in a real Genie Code Agent-mode chat (`skillkit genie-checklist`) and notes the outcome in the PR.
+The PR pipeline runs this for changed skills (3 runs) and, for coexistence, the routing test for every active skill, and posts the report on the PR. During the pilot the eval gate is advisory; it becomes blocking once the suite is stable. Before activating a new skill, the author also runs two cases in a real Genie Code Agent-mode chat (`skillkit genie-checklist`), checks the trajectory there (what the agent actually read and ran, in what order), and notes the outcome in the PR.
 
 ## 6. Ownership and freshness
 
@@ -126,6 +135,8 @@ The platform reviewer checks what the linter cannot:
 - [ ] The content does not belong in workspace instructions, `AGENTS.md` or Unity Catalog instead.
 - [ ] The description does not overlap an existing skill; the near-miss case is a real near miss.
 - [ ] Rules carry their reasons; there is one default per decision.
+- [ ] Steps that run something have a `Check:`; `## Recovery` covers the failures those steps can hit, with real fixes and a stop where the agent must not improvise.
+- [ ] At least one trigger case has a trajectory, and its `avoid` items name the wrong paths that matter for this task.
 - [ ] Variants are legitimate team differences, not contract breaks.
 - [ ] `sources` lists where the knowledge came from, with narrow globs.
 - [ ] Every security warning (scripts, network calls, URLs) is explained by the skill's purpose.

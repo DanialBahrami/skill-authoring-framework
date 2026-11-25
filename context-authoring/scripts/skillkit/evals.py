@@ -1,8 +1,10 @@
 """Eval runner: routing test, answer test with and without the skill (baseline), LLM judge.
 
 The runner simulates Genie Code with a model serving endpoint. It does not execute
-anything in the workspace: the model describes what it would do, and the answer is
-scored with regexes and a rubric judged by a second model.
+anything in the workspace: the model describes what it would do, in order, and the answer is
+scored with regexes and a rubric judged by a second model. A case's `trajectory` checks the
+described path as well as the result: `order` regexes must appear in that order, and the
+judge checks that none of the `avoid` actions is part of the plan.
 
 Routing: the model sees the catalog and picks the first skill to load, or none. The
 catalog is every skill in the repo that is not deprecated (drafts included, so a near
@@ -52,9 +54,11 @@ Return the single skill that should be loaded first to handle the request, or "n
 if no skill fits. Answer with JSON only: {"skill": "<name or none>"}"""
 
 AGENT_SYSTEM = """You are Genie Code in Agent mode in a Databricks workspace.
-In this test you cannot run anything. Describe exactly what you would do: the files you
-would create or change with their content, the SQL and code you would run, and the
-questions you would ask the user before acting. Follow the instructions and skills below."""
+In this test you cannot run anything. Describe exactly what you would do, in the order you
+would do it: anything you would read or look up first (files, tables, docs), the files you
+would create or change with their content, the SQL and code you would run, how you would
+check each result, and the questions you would ask the user before acting. Follow the
+instructions and skills below."""
 
 JUDGE_SYSTEM = """You grade an answer from a coding agent against a rubric.
 For each rubric item decide whether the answer satisfies it. Be strict: an item passes
@@ -62,7 +66,9 @@ only if the answer clearly does what it says. The agent could not run code, quer
 see the current date, so judge what it says it would do: do not fail an item for missing
 results that only running something would produce (actual table lists, real dates, real
 counts). A placeholder such as YYYY.MM.DD or <table_name> satisfies an item that asks for
-a value of that shape. Answer with JSON only:
+a value of that shape. An item that starts with "Avoids:" names an action the agent must not
+take: it passes only if the answer neither does nor plans that action, including as a first
+step to gather information. Answer with JSON only:
 {"items": [{"item": "<rubric item>", "pass": true|false, "reason": "<short>"}]}"""
 
 
@@ -145,10 +151,31 @@ class SkillVerdict:
     token_delta: str = "-"
 
 
+AVOID_PREFIX = "Avoids: "
+
+
+def check_order(answer: str, patterns: list[str]) -> str | None:
+    """None when every pattern matches in this order (each after the previous match), otherwise a note."""
+    pos = 0
+    for k, pattern in enumerate(patterns):
+        match = re.compile(pattern, re.I | re.M).search(answer, pos)
+        if not match:
+            if k and re.search(pattern, answer, re.I | re.M):
+                return f"trajectory: /{pattern}/ comes before /{patterns[k - 1]}/"
+            return f"trajectory: /{pattern}/ missing"
+        pos = match.end()
+    return None
+
+
 def score_answer(answer: str, case: dict[str, Any], judge: LLM | None, judge_endpoint: str,
                  max_tokens: int) -> tuple[bool, list[str]]:
     notes: list[str] = []
     ok = True
+    traj = case.get("trajectory") if isinstance(case.get("trajectory"), dict) else {}
+    order_note = check_order(answer, [str(p) for p in traj.get("order", []) or []])
+    if order_note:
+        ok = False
+        notes.append(order_note)
     for pattern in case.get("must_include", []) or []:
         if not re.search(pattern, answer, re.I | re.M):
             ok = False
@@ -158,7 +185,7 @@ def score_answer(answer: str, case: dict[str, Any], judge: LLM | None, judge_end
         if match:
             ok = False
             notes.append(f"forbidden /{pattern}/ matched '{match.group(0)[:60]}'")
-    rubric = case.get("rubric", []) or []
+    rubric = list(case.get("rubric", []) or []) + [AVOID_PREFIX + str(a) for a in traj.get("avoid", []) or []]
     if rubric and judge is not None:
         prompt = (f"Request:\n{case['prompt']}\n\nAnswer:\n{answer}\n\nRubric:\n"
                   + "\n".join(f"- {item}" for item in rubric))
@@ -170,7 +197,9 @@ def score_answer(answer: str, case: dict[str, Any], judge: LLM | None, judge_end
         for item in items:
             if not item.get("pass"):
                 ok = False
-                notes.append(f"rubric failed: {item.get('item')} ({item.get('reason', '')})")
+                text = str(item.get("item", ""))
+                kind = "trajectory" if text.startswith(AVOID_PREFIX.strip()) else "rubric"
+                notes.append(f"{kind} failed: {text} ({item.get('reason', '')})")
     return ok, notes
 
 

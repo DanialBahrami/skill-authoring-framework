@@ -2,7 +2,7 @@
 
 Each finding has a code so reviewers and docs can refer to it:
 
-  SK001-SK024  one skill
+  SK001-SK027  one skill
   CT001-CT004  the catalog of skills
   WI001-WI003  workspace instructions
   AG001-AG002  AGENTS.md files
@@ -42,6 +42,14 @@ UNVERIFIABLE_ASSERTION_RES = [
 ]
 # ...unless the assertion asks for the way to find out, which the model can give.
 ASKS_FOR_METHOD_RE = re.compile(r"(?i)\b(query|queries|sql|command|statement|step|steps|how to|code)\b")
+# A step "runs something" when it has a code block or an inline command; such a step needs a Check: line.
+STEP_RE = re.compile(r"(?m)^\d+\.\s")
+COMMAND_RE = re.compile(r"(?i)```|`(databricks|git|pip|python|%run|dbutils|spark\.sql|create|alter|merge|insert|update|delete|drop|"
+                        r"optimize|vacuum|grant|revoke|truncate)\b[^`]*`")
+CHECK_RE = re.compile(r"(?i)\bcheck:")
+# A recovery fix that only says to repeat the step.
+RETRY_ONLY_RE = re.compile(r"(?i)^\W*(just\s+)?(try( it)? again|retry( it)?|re-?run( it)?)\W*$")
+TRAJECTORY_KEYS = {"order", "avoid"}
 STOPWORDS = {"the", "a", "an", "and", "or", "to", "of", "in", "for", "on", "with", "when", "use", "user", "asks",
              "is", "it", "this", "that", "by", "as", "from", "not", "skill", "be", "are", "any", "into"}
 
@@ -80,6 +88,69 @@ def _local_links(text: str) -> list[str]:
             continue  # URL or in-page anchor
         links.append(target.split("#", 1)[0])
     return [link for link in links if link]
+
+
+def _section(body: str, name: str) -> str:
+    """Text of `## name` up to the next level-2 heading ("" when absent)."""
+    match = re.search(rf"(?ms)^##\s+{re.escape(name)}\s*$(.*?)(?=^##\s|\Z)", body)
+    return match.group(1) if match else ""
+
+
+def _steps(section: str) -> list[str]:
+    """Numbered steps of a Steps section, each with its continuation lines (code blocks included)."""
+    starts = [m.start() for m in STEP_RE.finditer(section)]
+    return [section[a:b] for a, b in zip(starts, starts[1:] + [len(section)])]
+
+
+def lint_steps_and_recovery(skill: Skill, std: Standard) -> list[Finding]:
+    """SK025: `## Recovery` is a symptom/cause/fix table with real fixes.
+    SK026: a step that runs something says how to check it (warning: the heuristic cannot see every case)."""
+    out: list[Finding] = []
+    where = f"skills/{skill.name}"
+    if "Recovery" in std.required_sections + std.optional_sections:
+        recovery = _section(skill.body, "Recovery")
+        if recovery.strip():
+            rows = [ln.strip() for ln in recovery.splitlines() if ln.strip().startswith("|")]
+            rows = [r for r in rows if not re.fullmatch(r"\|[\s:|-]+\|?", r)]   # drop the separator row
+            if len(rows) < 2:
+                _err(out, "SK025", where, "## Recovery needs a table (symptom | cause | fix) with at least one failure")
+            for row in rows[1:]:
+                cells = [c.strip() for c in row.strip("|").split("|")]
+                if cells and RETRY_ONLY_RE.match(cells[-1]):
+                    _err(out, "SK025", where, f"recovery fix '{cells[-1]}' only repeats the step; say what to change, "
+                         "or when to stop and ask the user")
+    for i, step in enumerate(_steps(_section(skill.body, "Steps")), start=1):
+        if COMMAND_RE.search(step) and not CHECK_RE.search(step):
+            _warn(out, "SK026", where, f"step {i} runs something but has no 'Check:' line saying how to confirm it worked")
+    return out
+
+
+def lint_trajectory(case: dict, where: str, label: str, code: str) -> list[Finding]:
+    """A case's `trajectory`: `order` regexes that must appear in order, `avoid` actions the judge checks."""
+    out: list[Finding] = []
+    traj = case.get("trajectory")
+    if traj is None:
+        return out
+    if not isinstance(traj, dict):
+        _err(out, code, where, f"{label}: trajectory must be an object with order and/or avoid")
+        return out
+    extra = set(traj) - TRAJECTORY_KEYS
+    if extra:
+        _err(out, code, where, f"{label}: trajectory keys not allowed: {', '.join(sorted(extra))}; use order, avoid")
+    order, avoid = traj.get("order") or [], traj.get("avoid") or []
+    if not isinstance(order, list) or not isinstance(avoid, list):
+        _err(out, code, where, f"{label}: trajectory order and avoid must be lists")
+        return out
+    if not order and not avoid:
+        _err(out, code, where, f"{label}: trajectory is empty")
+    if len(order) == 1:
+        _warn(out, code, where, f"{label}: trajectory order has one item; use must_include for a single name")
+    for pattern in order:
+        try:
+            re.compile(str(pattern))
+        except re.error as exc:
+            _err(out, code, where, f"{label}: bad regex in trajectory order: {exc}")
+    return out
 
 
 def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
@@ -144,6 +215,7 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
     for heading in headings:
         if heading not in required and heading not in optional:
             _err(out, "SK009", where, f"section '## {heading}' is not allowed; use {', '.join(required + optional)}")
+    out += lint_steps_and_recovery(skill, std)
 
     # Links from SKILL.md resolve; reference files do not link further
     for target in _local_links(skill.body):
@@ -250,8 +322,13 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
                 _err(out, "SK015", where, f"case {case.get('id')}: type must be trigger or near_miss")
             if not str(case.get("prompt", "")).strip():
                 _err(out, "SK015", where, f"case {case.get('id')}: prompt is empty")
-            if case.get("type") == "trigger" and not (case.get("must_include") or case.get("rubric")):
-                _err(out, "SK015", where, f"case {case.get('id')}: trigger cases need must_include or assertions")
+            if case.get("type") == "trigger" and not (case.get("must_include") or case.get("rubric")
+                                                      or case.get("trajectory")):
+                _err(out, "SK015", where, f"case {case.get('id')}: trigger cases need must_include, assertions or a trajectory")
+            if case.get("type") == "near_miss" and case.get("trajectory"):
+                _err(out, "SK015", where, f"case {case.get('id')}: near_miss cases only test routing; a trajectory "
+                     "belongs on a trigger case")
+            out += lint_trajectory(case, where, f"case {case.get('id')}", "SK015")
             for item in case.get("rubric", []) or []:
                 if any(r.search(str(item)) for r in UNVERIFIABLE_ASSERTION_RES) and not ASKS_FOR_METHOD_RE.search(str(item)):
                     _warn(out, "SK023", where, f"case {case.get('id')}: '{item}' needs facts the model cannot know "
@@ -262,6 +339,9 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
                         re.compile(pattern)
                     except re.error as exc:
                         _err(out, "SK015", where, f"case {case.get('id')}: bad regex in {key}: {exc}")
+        if triggers and not any(c.get("trajectory") for c in triggers):
+            _warn(out, "SK027", where, "no trigger case has a trajectory: add order and/or avoid to at least one, "
+                  "so the eval checks how the agent gets to the answer, not only the answer")
 
     # Folder hygiene
     for child in skill.path.iterdir():
@@ -493,7 +573,8 @@ def lint_journeys(root, skills: list[Skill]) -> list[Finding]:
                     re.compile(pattern)
                 except re.error as exc:
                     _err(out, "JR001", where, f"bad regex in {key}: {exc}")
-        if not (j.get("must_include") or j.get("assertions")):
+        out += lint_trajectory(j, where, "journey", "JR001")
+        if not (j.get("must_include") or j.get("assertions") or j.get("trajectory")):
             _warn(out, "JR001", where, "no must_include or assertions: the journey can only fail on routing")
         # Genie Code reaches a later skill only if an earlier one names it (listed in `uses`).
         if names and names[0] in status:

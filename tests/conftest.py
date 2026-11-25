@@ -26,6 +26,12 @@ Produces a PR description and checklist.
 
 - The bundle validates.
 
+## Recovery
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| No release branch for today | It is cut at noon | Branch from yesterday's release branch and say so in the description |
+
 ## References
 
 - [Title codes](references/title-codes.md): open when choosing the title code.
@@ -50,7 +56,8 @@ GOOD_EVALS = """{
   "evals": [
     {"id": "pr-01", "type": "trigger", "prompt": "Write the PR description for my gold schema change",
      "must_include": ["impact"]},
-    {"id": "pr-02", "type": "trigger", "prompt": "Open a hotfix PR", "assertions": ["Uses the hotfix branch"]},
+    {"id": "pr-02", "type": "trigger", "prompt": "Open a hotfix PR", "assertions": ["Uses the hotfix branch"],
+     "trajectory": {"order": ["impact", "hotfix branch"]}},
     {"id": "pr-nm-01", "type": "near_miss", "prompt": "Review this notebook for code style"}
   ]
 }

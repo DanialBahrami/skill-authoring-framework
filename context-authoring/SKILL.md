@@ -46,6 +46,16 @@ If you cannot run code, check every rule in [references/output-contract.md](refe
 - Every fact in every generated file traces to a source in its `skill.yaml` or in `inventory.md`.
 - Every conflict the skills depend on has a decision in `conflicts.md`.
 
+## Recovery
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `skillkit` does not import or install | No Python environment with the package | Use the manual checklist in references/validation.md and say in `summary.md` that lint and evals did not run |
+| Evals fail with an endpoint or permission error | The model or judge endpoint in `standard.yaml` is missing or not granted | Stop the eval step and tell the user which endpoint failed; do not switch endpoints on your own, since verdicts are only comparable on the same models |
+| Evals refuse to run: example workspace instructions | `context/workspace-instructions.md` still holds the framework example | Ask the user for the real instructions (or confirm there are none) before running evals |
+| The docs connector is not available | Confluence or another source cannot be reached | Continue from code only, mark the docs as not read in `coverage.md`, and list the pages to read next time in `backlog.md` |
+| A case still fails after three rounds | The skill, the case or the model is the problem | Stop and report the case, its notes and the answer (`--inspect`); never loosen a case only to make it pass |
+
 ## Rules
 
 - Distil, do not point. A skill never tells the agent to browse the repo or a wiki for conventions; copy the convention in. Runtime lookups are for live state only, because every read costs tokens on every use.

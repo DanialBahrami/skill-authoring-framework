@@ -38,7 +38,7 @@ def test_empty_output_folder_uses_the_skill_defaults(tmp_path: Path):
 def test_output_folder_standard_overrides_only_what_it_sets(tmp_path: Path):
     (tmp_path / "standard.yaml").write_text("limits:\n  body_max_lines: 80\nprefixes:\n  dp: data-platform\n")
     std = load_standard(tmp_path)
-    assert std.limit("body_max_lines") == 80 and std.limit("description_max_chars") == 600
+    assert std.limit("body_max_lines") == 80 and std.limit("description_max_chars") == 1024
     assert std.prefixes == {"dp": "data-platform"}
 
 

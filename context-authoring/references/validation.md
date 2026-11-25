@@ -13,18 +13,19 @@ Three checks, in order: the output follows the contract, every name in it is rea
 
 ## 1. Contract
 
-With the scripts (see SKILL.md, "Limits and tooling"): `lint` (no names, so the catalog, journey and dependency checks run too) and fix every error. SK023 warns about assertions a model cannot satisfy without running anything ("names the latest release branch", "lists the existing tables"); rewrite them to expect the query or the step. Warnings marked SK020 (scripts, network calls, external URLs) go to the human reviewer.
+With the scripts (see SKILL.md, "Limits and tooling"): `lint` (no names, so the catalog, journey and dependency checks run too) and fix every error. SK026 warns about a step that runs something without a `Check:` line, and SK027 about a skill whose trigger cases have no trajectory; fix both unless the reason is clear. SK023 warns about assertions a model cannot satisfy without running anything ("names the latest release branch", "lists the existing tables"); rewrite them to expect the query or the step. Warnings marked SK020 (scripts, network calls, external URLs) go to the human reviewer.
 
 Without it, check by hand and write the result in `summary.md`:
 
 - [ ] Folder name equals `name`, which is `<prefix>-<verb>-<object>` with the team's registered prefix.
-- [ ] Description is third person, 80–600 characters, contains `Use when`, and names the neighbour it is not for when they share vocabulary.
-- [ ] Body is under 200 lines, has `## Steps` and `## Verify`, and no sections outside the allowed list.
+- [ ] Description is third person, 80–1,024 characters, contains `Use when`, and names the neighbour it is not for when they share vocabulary.
+- [ ] Body is under 500 lines, has `## Steps`, `## Verify` and `## Recovery` in that order, and no sections outside the allowed list.
+- [ ] Every step that runs something has a `Check:` line; every `## Recovery` row has a real fix (not "try again").
 - [ ] Every link points to a file in the skill folder; reference files do not link further.
 - [ ] Every skill named in the body is in `uses`, exists, and is not deprecated; no skill uses itself through others; platform skills do not use team skills.
 - [ ] No catalog names, hosts, emails, IDs, tokens, dates or version notes (search for the organisation's own names too).
 - [ ] `skill.yaml` has owner, status `draft`, `last_reviewed`, and at least one source; every variant has an owner.
-- [ ] `evals/evals.json` has at least two trigger cases and one near miss.
+- [ ] `evals/evals.json` has at least two trigger cases and one near miss, and at least one trigger case has a `trajectory`.
 - [ ] Every decision from the inventory's vocabulary that the task touches (load type, delete handling, data quality severity, breaking or not before anything destructive) appears in the skill as a step with its default and the condition for the alternative.
 - [ ] Every skill that uses others has a journey in `evals/journeys.json`, and every skill in a journey is reachable from its first skill through `uses` (JR002).
 - [ ] `context/workspace-instructions.md` holds the workspace's real instructions, not the framework example: evals inject it into every answer.
@@ -65,7 +66,7 @@ Evals call a model through a serving endpoint; they are not Genie Code itself. B
 
 1. Install the draft as a personal skill (`/Workspace/Users/<you>/.assistant/skills/<name>/`).
 2. In a new Agent-mode thread, open a file in the folder the task belongs to and give two of the skill's trigger prompts, worded as a user would.
-3. Check: the skill was used; the answer uses the real helpers and conventions; nothing was hardcoded; risky steps asked for consent; skills named in its steps were followed.
+3. Check: the skill was used; the answer uses the real helpers and conventions; nothing was hardcoded; risky steps asked for consent; skills named in its steps were followed; the trajectory items hold for what Genie Code actually read and ran.
 4. Note whether Genie Code read repo files to answer. Reading code is allowed, but if it read the files the skill distils, the skill may not be doing the work.
 5. If the task can start outside the repo (SQL editor, a new notebook), ask one prompt with no repo file open: `AGENTS.md` does not load then.
 6. Give each journey's prompt and check that every skill in it was used.
@@ -84,7 +85,9 @@ Record the result in `summary.md`. A skill that uses other skills always gets th
 | Skill used for the wrong task | Two descriptions overlap | Sharpen both; add a near-miss case naming the right skill |
 | Agent hardcodes a catalog or path | The step did not say where the value comes from | Name the bundle variable or widget in the step |
 | Agent does something destructive without asking | No guard at that step | Add the consent step where the risk occurs, with the non-destructive option first |
-| Agent reads the repo or a wiki page to find a convention | The skill points instead of distilling | Copy the convention into the skill or `AGENTS.md` |
+| Agent reads the repo or a wiki page to find a convention | The skill points instead of distilling | Copy the convention into the skill or `AGENTS.md`, and add the detour to a case's `trajectory.avoid` |
+| Trajectory order fails, answer is right | The skill's steps are not in the order the agent should act, or a step is missing | Reorder the steps; put read-only checks before writes |
+| Agent improvises after an error (retries, works around it, writes elsewhere) | No `Check:` on the step, or no `## Recovery` row for that failure | Add the check and the row, with a stop where improvising would do harm |
 | Two teams' ways mixed in one answer | Variant condition unclear | State the condition in step 1 and keep each way in its own reference file |
 | NO EFFECT on every case | The model already knows this | Delete the skill |
 

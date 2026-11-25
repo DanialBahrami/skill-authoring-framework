@@ -196,10 +196,13 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `ops/pi
 | SK007–SK009 | Body size; required and allowed sections |
 | SK010–SK012 | Links resolve; reference files don't link further; long references start with `## Contents` |
 | SK013 | No catalog names, hosts, emails, GUIDs, tokens or dated notes in deployed files |
-| SK014–SK016 | `skill.yaml` fields; `evals/evals.json` minimums; variants |
+| SK014–SK016 | `skill.yaml` fields; `evals/evals.json` minimums and `trajectory` shape; variants |
 | SK017–SK019 | No `TODO` in active skills; no stray files; deprecated notice |
 | SK020 | Security review warnings: scripts, network calls, external URLs, paths outside the skill |
 | SK024 | Asset files: Python compiles, YAML and JSON parse |
+| SK025 | `## Recovery` is a symptom/cause/fix table with at least one row; no fix that only says to try again |
+| SK026 | A step that runs something (code block or inline command) has a `Check:` line (warning) |
+| SK027 | At least one trigger case has a `trajectory` (warning) |
 | SK021 | `uses` matches the skills named in the body; dependencies exist and are active |
 | SK022 | `supersedes`: not itself; the superseded repo skill is deprecated once this one is active |
 | SK023 | An assertion needs facts the model cannot know without running anything (warning) |
