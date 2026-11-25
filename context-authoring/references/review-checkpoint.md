@@ -32,6 +32,9 @@ The meta-skill shows the planned family before generating. This is the cheapest 
 
 - [ ] Every skill is a task people ask for on its own; nothing exists only to be reused by other skills.
 - [ ] No two skills cover the same task; another team's way is a variant inside the skill, not a second skill.
+- [ ] Nothing marked "new" duplicates an existing skill.
+- [ ] Every "updated" skill names the eval case that fails with it today; an update without one is just more facts, so drop it.
+- [ ] Changes to another team's skills are marked "proposed", and that team has been asked.
 - [ ] Arrows go from a workflow to the skills it names at a step, at most two levels deep; platform skills never use team skills.
 - [ ] Shared rules went to the `AGENTS.md` candidates, not into a skill of their own.
 - [ ] With `catalog.installed_skills: use`: no planned skill duplicates an installed one.

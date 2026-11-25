@@ -1,5 +1,7 @@
 # Update mode: one skill, changed sources
 
+Also used from create mode (step 6) when a new scope shows that an existing skill fails: the trigger is then an eval case, written from the new folders or pages, that fails with the skill today. New facts alone are not a trigger. The change is recorded as "updated" in `skill-map.md`, and as "proposed" when another team owns the skill.
+
 Triggered by a freshness comment on a source-repo PR, a changed doc page, a failed eval, a review date, or a reported wrong answer.
 
 1. Get the skill name and the trigger: changed paths with the commit range, changed page ids, the failing eval case, or the wrong answer with the prompt that caused it.

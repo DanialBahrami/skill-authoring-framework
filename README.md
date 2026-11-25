@@ -87,8 +87,37 @@ Before writing any skill, Genie shows the planned family in `skill-map.md`: a ta
 The second run is cheaper than the first:
 
 - **Update mode** reads only what changed and edits the fewest lines that make the skill true again, so human fixes elsewhere survive. A wrong answer is first added as a failing eval case, then fixed. The journeys that include the skill are checked too.
-- **A new create run** starts from what exists: current skills, the last run's backlog, and conflict decisions already made, which it doesn't ask about again. If another team does a task differently, its way becomes a variant inside the existing skill, not a second skill.
+- **A new create run** starts from what exists: current skills, the last run's backlog, and conflict decisions already made, which it doesn't ask about again. For each task it finds, it decides: a new skill; a variant inside the existing skill when another team does the task differently; or no change. Never a second skill for a task that has one. It updates an existing skill only when it can show the skill fails, with an eval case that fails today; finding more facts is not enough, because every extra line costs tokens and can conflict. Changes to another team's skills are proposed for that team to approve. `skill-map.md` marks every skill as new, updated, variant added or unchanged.
 - **Evals** cache their results, so only cases whose skill or question changed run again.
+
+### When a skill should change
+
+Only when something shows it fails or is about to. Each change is small and checked by evals before and after:
+
+| Trigger | Evidence | Change |
+| --- | --- | --- |
+| A wrong answer, or a failing eval | The failing prompt | Add it as an eval case that fails today, fix the skill, see it pass |
+| A source changed (helper renamed, template moved, doc page rewritten) | The diff, or the freshness check | Update the facts that changed, nothing else |
+| A case people need that the skill doesn't handle | A real prompt it gets wrong | As for a wrong answer |
+| Another team does the task differently | A conflict decided as "variant" | Add the variant |
+| The review date passed | Age | The owner re-checks; often nothing changes |
+
+Finding more facts is not a trigger. A fact belongs in a skill only if the agent gets the task wrong without it.
+
+### Other teams
+
+Any team, the platform team included, can use the meta-skill for its own folders. Each new skill then meets the same bar:
+
+- **Standard:** lint enforces the format, sizes, required sections, naming, and no hardcoded environment values.
+- **Checked:** names are checked against the repo, and evals with and without the skill prove it helps. The execution gate checks generated SQL, journeys check skills that chain, and a person tries it in Genie Code.
+- **Not redundant:** before writing, the meta-skill loads the existing skills and adds a variant or, when an eval case shows a skill fails, updates it, instead of duplicating it. Lint warns when two descriptions overlap, and the review checkpoint asks about duplicates.
+- **Not unnecessary:** a skill exists only for a task people ask for on its own. Shared rules go to `AGENTS.md`, and a skill with no measurable effect (NO EFFECT) is deleted.
+
+The redundancy check only covers skills the run can see, so teams must share one skill family:
+
+- **One shared output folder** for everyone, for example a Git folder or a context repo (see [Running it at scale](#9-running-it-at-scale)), not each person's own `genie-skills/`. Pass it as "Output folder: <path>".
+- **A prefix per team** in that folder's `standard.yaml` (`prefixes: {dp: data-platform, em: energy-management}`), so every skill has an owner and conflicts with platform conventions go to the platform team.
+- **`catalog.installed_skills: use`** once the workspace has skills from elsewhere, so runs also compare against what's installed.
 
 ## 5. What you get
 
