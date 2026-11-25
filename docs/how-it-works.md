@@ -22,7 +22,7 @@ The **meta-skill** is the framework: a `SKILL.md` with the steps and reference f
 
 ## The files a run produces
 
-![Files by stage: coverage and inventory; classification and conflicts; skills with evals, journeys and three proposals; eval report, Genie Code checklist, summary and backlog.](img/run-files.svg)
+![Files by stage: coverage and inventory; classification and conflicts; skill map, skills with evals, journeys and three proposals; eval report, Genie Code checklist, summary and backlog.](img/run-files.svg)
 
 **The product** is the only part Genie Code uses when helping people.
 
@@ -46,6 +46,7 @@ The **meta-skill** is the framework: a `SKILL.md` with the steps and reference f
 | `coverage.md` | Every folder: file count, kind (production, shared library, team-owned, tooling, ad hoc, archive), how closely it was read; every doc page read and whether it was useful | A partial run shows as partial; skills never copy from ad hoc scripts |
 | `inventory.md` | The facts: tasks with sub-steps, helpers, templates, values, guardrails, each with a source | Skills are written from this, not from memory |
 | `classification.md` | Where each fact goes | One place per fact |
+| `skill-map.md` | Every skill, what it uses and is used by, team variants, journeys and verdicts, as a table and a diagram. Planned at step 6 and shown before any skill is written; regenerated from the written skills at step 8 | The family's shape is reviewed before effort goes into writing it |
 | `conflicts.md` | Disagreements, a suggested decision, and the decision people made | The agent never guesses a side |
 | Eval report | Per skill: ADDS VALUE, NO EFFECT, FAILING or INCONCLUSIVE | Proof that each skill helps |
 | `genie-check.md` | Prompts to paste into a real Genie Code chat and what to look for | The one check the simulation can't do |

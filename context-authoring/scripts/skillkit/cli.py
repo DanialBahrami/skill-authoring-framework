@@ -63,6 +63,18 @@ def cmd_lint_agents(args) -> int:
 def cmd_catalog(args) -> int:
     root, std = _ctx(args)
     skills = load_skills(root)
+    if args.map:
+        from .evals import load_journeys
+        from .skillmap import load_verdicts, map_markdown
+
+        md = map_markdown(skills, load_journeys(root), load_verdicts(Path(args.eval_json) if args.eval_json else None),
+                          args.scope or "")
+        if args.out:
+            Path(args.out).write_text(md, encoding="utf-8")
+            print(f"wrote {args.out}")
+        else:
+            print(md)
+        return 0
     budget = std.limit("catalog_max_tokens")
     superseded = {n for s in skills if s.status != "deprecated" for n in s.supersedes}
     active = planned = 0
@@ -323,6 +335,11 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("catalog", help="list skills and token budgets (active, planned, with installed skills)")
     s.add_argument("--installed", help="installed skills folder, e.g. /Workspace/.assistant/skills in a notebook "
                    "or a local export of it; counts its skills in the budget and checks overlap")
+    s.add_argument("--map", action="store_true",
+                   help="write the skill map instead: table and diagram of skills, uses, journeys and verdicts")
+    s.add_argument("--eval-json", help="with --map: an `eval --json` results file, for the verdict column")
+    s.add_argument("--scope", help="with --map: the run's scope, for the title")
+    s.add_argument("--out", help="with --map: write it here, e.g. <run folder>/skill-map.md")
     s.set_defaults(func=cmd_catalog)
 
     s = sub.add_parser("check-names", help="report names in skills that are not found in the source repos")

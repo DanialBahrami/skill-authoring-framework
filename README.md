@@ -67,6 +67,8 @@ Conflicts are decided in conflicts.md. Generate the skills, then validate:
 lint, check-names against <repo path>, and eval --runs 3.
 ```
 
+Before writing any skill, Genie shows the planned family in `skill-map.md`: a table and a diagram of which tasks become skills and which skill uses which. Reply "go", or say what to merge, split or drop; it's the cheapest moment to change the family's shape. After the evals, the map is regenerated from the skills actually written, with their verdicts.
+
 **You: try and hand over.**
 
 1. Copy one or two draft skills into your personal skills folder.
@@ -99,7 +101,7 @@ The second run is cheaper than the first:
 │   └── evals/evals.json                 eval cases (not deployed)
 ├── evals/journeys.json                  eval cases for tasks that chain skills
 └── authoring/runs/<date>-<scope>/       working papers: review, resume, next run
-    ├── coverage.md  inventory.md  classification.md  conflicts.md
+    ├── coverage.md  inventory.md  classification.md  conflicts.md  skill-map.md
     ├── agents-md-candidates.md  workspace-instructions.diff.md  uc-comments.sql   proposals for their owners
     ├── genie-check.md  summary.md  backlog.md
 ```
@@ -118,6 +120,7 @@ The scripts in `context-authoring/scripts/` do what an agent can't do reliably o
 | `eval --execute` | Plans the SQL in each answer with `EXPLAIN` and describes the tables on a development warehouse or Spark session; checks Python and YAML syntax | Catches invented tables and columns that look right in text |
 | `genie-checklist` | Prompts to paste into a real Genie Code chat and what to look for | Evals are a simulation; this is the real check |
 | `catalog` | Skill descriptions and the token budget they use | Every description is paid in every session |
+| `catalog --map` | The skill map: every skill, what it uses and is used by, journeys and verdicts, as a table and a diagram | Generated from the files, so it always matches the skills actually written |
 
 Genie runs them like this (the meta-skill's `SKILL.md` has the snippet):
 

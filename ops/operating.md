@@ -172,6 +172,7 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `ops/pi
 | `lint [skills]` | Checks skills; with no names also catalog budget, overlap, dependencies and workspace instructions |
 | `lint-agents <files>` | Checks `AGENTS.md` files (size, no emails or tokens) |
 | `catalog [--installed DIR]` | Skills, status, owner, description tokens; active and planned (active + drafts, minus superseded) budget; with `--installed`, skills already in the workspace, their share of the budget and overlap with repo skills |
+| `catalog --map [--eval-json F] [--scope S] [--out F]` | The skill map: table and Mermaid diagram of skills, `uses`, journeys, team variants and eval verdicts |
 | `check-names [skills] --repo R [--repo R2] [--ignore N …] [--strict]` | Names in skills, their references and Markdown assets (inline code) that are not found in the source repos, as paths (globs allowed), file names or in contents |
 | `genie-checklist [skills] [--prompts N] [--out F]` | Prompts to paste in Genie Code and what to look for, per skill and per journey, with a no-file-open prompt and a "read repo files?" check |
 | `new <name> [--owner T]` | Scaffolds a draft skill; owner from the prefix, or `--owner` when no prefixes are configured |
