@@ -76,6 +76,13 @@ def candidate(span: str) -> str | None:
     return span.rstrip("/")
 
 
+def _strip_suffix(path: str) -> str:
+    """`a/b/setup.py` -> `a/b/setup`; a path without an extension is returned unchanged."""
+    head, _, last = path.rpartition("/")
+    stem = last.rsplit(".", 1)[0] if "." in last.lstrip(".") else last
+    return f"{head}/{stem}" if head else stem
+
+
 def _found(name: str, idxs: list[RepoIndex]) -> bool:
     low = name.lower().lstrip("./")
     for idx in idxs:
@@ -85,8 +92,15 @@ def _found(name: str, idxs: list[RepoIndex]) -> bool:
                 return True
             continue
         if "/" in low:
-            if low in idx.paths or any(p.endswith("/" + low) or p.endswith(low) for p in idx.paths):
+            # A path matches whole segments, and notebooks are named without their extension
+            # (`%run ../Common/setup` is setup.py). Never fall back to the file name alone:
+            # `ib/merge.py` must not be found because `lib/merge.py` or any `merge.py` exists.
+            if any(c == low or c.endswith("/" + low) for p in idx.paths for c in (p, _strip_suffix(p))):
                 return True
+            mention = re.compile(r"(?<![\w-])" + re.escape(name) + r"(?![\w/-])")
+            if any(mention.search(text) for text in idx.text):
+                return True
+            continue
         if low in idx.names or Path(low).stem in idx.names:
             return True
         if name in idx.tokens:
