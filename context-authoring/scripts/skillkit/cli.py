@@ -73,6 +73,8 @@ def cmd_catalog(args) -> int:
         planned += tokens if s.status in ("active", "draft") and s.name not in superseded else 0
         note = "  (superseded)" if s.name in superseded else ""
         print(f"{s.name:40} {s.status:11} {s.owner:20} {tokens}{note}")
+    if args.installed and std.raw.get("catalog", {}).get("installed_skills", "ignore") == "ignore":
+        print("note: catalog.installed_skills is 'ignore'; counting --installed because you gave it explicitly")
     installed = load_installed(Path(args.installed), {s.name for s in skills}) if args.installed else []
     kept = 0
     if installed:
@@ -158,9 +160,10 @@ def cmd_new(args) -> int:
     root, std = _ctx(args)
     name = args.name
     team = std.team_for_prefix(name)
-    if team is None:
+    if team is None and std.prefixes:
         print(f"prefix of '{name}' is not registered in standard.yaml", file=sys.stderr)
         return 1
+    team = team or args.owner or "<owning team>"   # no teams configured: owner is free text
     target = root / "skills" / name
     if target.exists():
         print(f"{target} already exists", file=sys.stderr)
@@ -337,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("new", help="scaffold a draft skill from the meta-skill's skill template")
     s.add_argument("name")
+    s.add_argument("--owner", help="owning team, when standard.yaml has no prefixes")
     s.set_defaults(func=cmd_new)
 
     s = sub.add_parser("eval", help="run routing and answer evals, with a no-skill baseline")

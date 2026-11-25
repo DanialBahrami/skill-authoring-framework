@@ -23,7 +23,7 @@ Coverage: <complete / partial: which folders were not read closely; see coverage
 
 ## Proposed additions to standard.yaml
 
-Environment-specific names found in the code that skills must never contain (catalogs, storage accounts, hosts, paths). For the context repo's `forbidden_patterns`; never for a shared or public copy of the framework.
+Environment-specific names found in the code that skills must never contain (catalogs, storage accounts, hosts, paths). For `forbidden_patterns` in the output folder's `standard.yaml`; never in a shared or public copy of the framework.
 
 | Name | Regex | Example from the code (source) |
 | --- | --- | --- |

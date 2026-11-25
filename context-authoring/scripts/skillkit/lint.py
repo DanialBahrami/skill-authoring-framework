@@ -2,7 +2,7 @@
 
 Each finding has a code so reviewers and docs can refer to it:
 
-  SK001-SK023  one skill
+  SK001-SK024  one skill
   CT001-CT004  the catalog of skills
   WI001-WI003  workspace instructions
   AG001-AG002  AGENTS.md files
@@ -14,6 +14,8 @@ import datetime as dt
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+import yaml
 
 from .model import (
     EVALS_FILE,
@@ -269,6 +271,8 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
         if child.name not in allowed:
             _err(out, "SK018", where, f"'{child.name}' is not part of the skill layout")
 
+    out += lint_assets(skill)
+
     # Security review signals (warnings: they need a reviewer, not a rejection)
     if (skill.path / "scripts").is_dir() and any((skill.path / "scripts").rglob("*")):
         _warn(out, "SK020", where, "contains scripts: security review required (scripts run with the user's access)")
@@ -410,6 +414,44 @@ def lint_agents_md(path: Path, std: Standard) -> list[Finding]:
         match = pattern.search(text)
         if match:
             _err(out, "AG002", where, f"contains {label}: '{match.group(0)}'")
+    return out
+
+
+ASSET_PLACEHOLDER_RE = re.compile(r"<[A-Za-z_][\w -]*>|\{\{[^}]*\}\}")
+
+
+def lint_assets(skill: Skill) -> list[Finding]:
+    """SK024: asset templates must be valid. Python is compiled (notebook magics dropped), YAML and
+    JSON are parsed. Placeholders such as <table_name> or {{var}} are filled with a dummy first."""
+    import json
+    import textwrap
+
+    out: list[Finding] = []
+    base = skill.path / "assets"
+    if not base.is_dir():
+        return out
+    for path in sorted(p for p in base.rglob("*") if p.is_file()):
+        where = f"skills/{skill.name}/{path.relative_to(skill.path).as_posix()}"
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        filled = ASSET_PLACEHOLDER_RE.sub("placeholder_value", text)
+        suffix = path.suffix.lower()
+        try:
+            if suffix == ".py":
+                lines = [ln for ln in textwrap.dedent(filled).splitlines() if not ln.lstrip().startswith(("%", "!"))]
+                compile("\n".join(lines), str(path), "exec")
+            elif suffix in (".yml", ".yaml"):
+                yaml.safe_load(filled)
+            elif suffix == ".json":
+                json.loads(filled)
+        except SyntaxError as exc:
+            _err(out, "SK024", where, f"Python does not compile: {exc.msg} (line {exc.lineno})")
+        except yaml.YAMLError as exc:
+            _err(out, "SK024", where, f"YAML does not parse: {str(exc).splitlines()[0]}")
+        except ValueError as exc:
+            _err(out, "SK024", where, f"JSON does not parse: {exc}")
     return out
 
 

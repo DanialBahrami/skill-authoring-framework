@@ -22,8 +22,10 @@ Anything that appears in two or more tasks: a sub-step, a rule, a vocabulary. De
 
 ## Shared helpers and templates
 
-| Name | Signature / usage | What it guarantees | Source |
-| --- | --- | --- | --- |
+Template decision (see `references/writing-skills.md`, "Assets"): **in repo** (the skill names it by path), **copy to assets** (the task can start outside the repo), **build asset** (no template exists, people repeat the same shape), **none**.
+
+| Name | Signature / usage | What it guarantees | Template decision | Source |
+| --- | --- | --- | --- | --- |
 
 ## Vocabulary
 
