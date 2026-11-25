@@ -23,9 +23,9 @@ The meta-skill (`context-authoring/`) creates skills in an output folder; nothin
 Done once by the platform team. Step 7 must happen before the first deploy, because the deploy removes workspace skills that are not in the repo.
 
 1. **Create the context repo.** Create a repo from this framework (so `context-authoring/`, `ops/` and `pyproject.toml` come along and `pip install .` gives `skillkit` and `skillkit-ops`), then lay out the output folder at its root:
-    - `skills/` and `evals/journeys.json`: move in the skills from your output folder, or start from `examples/output/skills/` (fictional) for reference.
+    - `skills/` and `evals/journeys.json`: move in the skills from your output folder.
     - `standard.yaml`: copy [`standard.example.yaml`](standard.example.yaml) and set `teams` (with their `codeowners` or `reviewers` groups), `prefixes`, your environment catalog regex in `forbidden_patterns` (the example uses `lakehouse_dev|stg|prd`), the eval endpoints, and `catalog.installed_skills` (`use` once the repo is the only source of workspace skills).
-    - `context/workspace-instructions.md`: copy in your workspace's current instructions (`/Workspace/.assistant_workspace_instructions.md`). In a context repo this Git copy is the master: evals use it instead of the live file, and the pipeline deploys it. The copy in `examples/output/context/` is an example with an `<!-- EXAMPLE` marker; evals refuse to run and `build` refuses to deploy while a file carries it.
+    - `context/workspace-instructions.md`: copy in your workspace's current instructions (`/Workspace/.assistant_workspace_instructions.md`). In a context repo this Git copy is the master: evals use it instead of the live file, and the pipeline deploys it.
     - `evals/decoys.yaml` (optional): the built-in skills present in your workspace, if they differ from the skill's defaults.
 2. **Create a service principal** and add it to every target workspace. Give it an OAuth secret (Databricks OAuth machine-to-machine works on AWS, Azure and GCP). Only admins can create items at the workspace root, so an admin first creates `/Workspace/.assistant/` and an empty `/Workspace/.assistant_workspace_instructions.md`. Grant the service principal `CAN MANAGE` on both, and `CAN QUERY` on the eval endpoints. For the optional execution gate, also `CAN USE` on a development SQL warehouse and only `USE CATALOG`, `USE SCHEMA` and `SELECT` on the development catalog: the gate sends only `EXPLAIN`, and read-only access means a mistake still cannot change data.
 3. **Lock the skills folder**: all users `CAN READ` on `/Workspace/.assistant/skills/` (Genie Code reads skills as the user); no other write grants.
@@ -114,7 +114,7 @@ Only `EXPLAIN` and `DESCRIBE TABLE` are ever sent; both read metadata, never row
 
 **Coexistence**: when any skill changes, the PR pipeline reruns routing for **every** active skill, so a new description cannot steal prompts from existing ones. The linter also warns when two descriptions overlap.
 
-**`AGENTS.md` is evaluated too**: `skillkit eval-context --cases examples/data-platform/agents-evals.json --repos-root ~/repos` runs the same prompts with and without the `AGENTS.md` files. Add `--agents-drafts <run folder>/agents-md` to evaluate drafts before they reach the source repo. Research found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped — so people write `AGENTS.md`, and it has to show it helps.
+**`AGENTS.md` is evaluated too**: `skillkit eval-context --cases evals/agents.json --repos-root ~/repos` (a cases file in the same format as a skill's `evals.json`, with `agents` paths) runs the same prompts with and without the `AGENTS.md` files. Add `--agents-drafts <run folder>/agents-md` to evaluate drafts before they reach the source repo. Research found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped — so people write `AGENTS.md`, and it has to show it helps.
 
 ## 4. Multi-team repositories
 

@@ -15,7 +15,7 @@ Turns a repo that people work in (data engineering, ML, analytics or apps on Dat
 - **create**: a repo, team or domain gets its context for the first time. Follow the steps below.
 - **update**: one skill's sources changed or it gave a wrong answer. Follow [references/update-mode.md](references/update-mode.md) instead.
 
-**Where output goes.** Ask the user for an output folder (suggest `/Workspace/Users/<them>/genie-skills/`; a Git folder if they want review through pull requests). Skills go to `<output>/skills/<name>/`, journeys to `<output>/evals/journeys.json`, the run's working files to `<output>/authoring/runs/<YYYY-MM-DD>-<scope>/`. Never write to the source repo, the workspace skills folder, the workspace instructions or Unity Catalog: drafts are reviewed first, and `AGENTS.md`, instruction changes and comments are proposals that their owners apply.
+**Where output goes.** Write to the folder the user named, otherwise `/Workspace/Users/<current user>/genie-skills/` (`SELECT current_user()`); reuse it if it already has skills or runs, and say where in your first reply. The layout inside it is in [references/output-contract.md](references/output-contract.md). Never write to the source repo, the workspace skills folder, the workspace instructions or Unity Catalog.
 
 **Limits and tooling.** The defaults are in `assets/defaults/standard.yaml`; a `standard.yaml` in the output folder overrides any of them (limits, team prefixes, forbidden patterns, eval endpoints). The checks are scripts in this skill's `scripts/` folder. Run them with your code tool, nothing to install:
 
