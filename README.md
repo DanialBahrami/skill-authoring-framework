@@ -17,7 +17,6 @@ It adapts [framework-skill-authoring](https://github.com/grusin-db/framework-ski
 9. [Running it at scale](#9-running-it-at-scale)
 10. [Repository layout](#10-repository-layout)
 11. [Standards it follows](#11-standards-it-follows)
-12. [Known limitations](#12-known-limitations)
 
 ---
 
@@ -188,9 +187,6 @@ docs/
 ├── how-it-works.md             diagrams and every file explained
 └── STANDARD.md                 the skill standard in full
 ops/                            optional: context repo, pipelines, deploy, freshness
-examples/
-├── output/                     an example output folder with a fictional skill
-└── data-platform/              an example AGENTS.md and its eval cases
 tests/                          unit tests and a dry run of the installed skill
 ```
 
@@ -204,12 +200,3 @@ tests/                          unit tests and a dry run of the installed skill
 | [Anthropic: skills for enterprise](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/enterprise) | Review, separation of duties, coexistence testing, lifecycle |
 | [Evaluating AGENTS.md (ETH Zurich)](https://arxiv.org/html/2602.11988v1) | Human-written, minimal, evaluated `AGENTS.md` |
 | [framework-skill-authoring](https://github.com/grusin-db/framework-skill-authoring) | Analysis method, vocabularies, validation ideas |
-
-## 12. Known limitations
-
-- **Running the scripts from Genie Code is untested.** They work from an installed copy of the folder in tests, but the first real run should confirm that Genie Code adds the skill's `scripts/` folder to the Python path as the snippet says. If it can't, run the snippet from a notebook yourself.
-- **Undocumented Genie Code behaviour.** Precedence between nested `AGENTS.md` files and workspace instructions, which Genie Code modes read `AGENTS.md`, and whether a skill named in another skill's steps gets loaded are not documented. The Genie Code checklist tests the last one.
-- **Evals are a simulation** through model serving endpoints, not the Genie Code agent itself. Check each new skill in a real Agent-mode chat with `genie-check.md`.
-- **The execution gate checks metadata, not results.** It cannot see whether a query returns the right rows, and PySpark DataFrame code is checked for syntax only.
-- **Deploy and the pipelines in `ops/` are tested with mocks only.** Start in a dev workspace with `--dry-run`.
-- **The example skill is fictional.**

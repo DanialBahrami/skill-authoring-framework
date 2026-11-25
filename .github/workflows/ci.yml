@@ -1,4 +1,4 @@
-# CI for this framework repo: unit tests and lint of the example output folder.
+# CI for this framework repo: unit tests (including a dry run of the installed skill) and template lint.
 name: ci
 
 on:
@@ -22,6 +22,5 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: pytest -q
-      - run: skillkit --root examples/output lint
-      - run: skillkit --root examples/output lint-agents examples/data-platform/AGENTS.md
+      - run: skillkit lint-agents context-authoring/assets/templates/AGENTS.repo.md context-authoring/assets/templates/AGENTS.team.md
       - run: skillkit-ops --help

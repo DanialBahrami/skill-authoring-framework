@@ -119,16 +119,11 @@ def test_workspace_instructions_limits(repo: Path):
     assert {"WI001", "WI002"} <= codes(lint.lint_workspace_instructions(path, std))
 
 
-def test_shipped_repo_lints_clean():
-    """The example output folder, its skill and workspace instructions pass lint with the defaults."""
-    out = REPO / "examples" / "output"
-    std = load_standard(out)
-    skills = load_skills(out)
-    assert skills
-    findings = [f for s in skills for f in lint.lint_skill(s, std)]
-    findings += lint.lint_catalog(skills, std)
-    findings += lint.lint_workspace_instructions(out / "context" / "workspace-instructions.md", std)
-    findings += lint.lint_agents_md(REPO / "examples" / "data-platform" / "AGENTS.md", std)
+def test_shipped_templates_lint_clean(tmp_path: Path):
+    """The meta-skill's AGENTS.md templates pass lint with the defaults."""
+    std = load_standard(tmp_path)
+    templates = REPO / "context-authoring" / "assets" / "templates"
+    findings = [f for name in ("AGENTS.repo.md", "AGENTS.team.md") for f in lint.lint_agents_md(templates / name, std)]
     assert [str(f) for f in findings if f.severity == "error"] == []
 
 
