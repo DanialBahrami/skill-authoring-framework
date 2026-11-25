@@ -22,7 +22,7 @@ stages:
             inputs: { versionSpec: "3.11" }
           - script: pip install -e ".[databricks]"
             displayName: Install skillkit
-          - script: skillkit build --out $(Build.ArtifactStagingDirectory)/bundle
+          - script: skillkit-ops build --out $(Build.ArtifactStagingDirectory)/bundle
             displayName: Lint and build
           - publish: $(Build.ArtifactStagingDirectory)/bundle
             artifact: bundle

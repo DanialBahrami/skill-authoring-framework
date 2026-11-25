@@ -11,6 +11,7 @@ The output contract says what a skill must contain. This file is about writing i
 - Risky steps
 - Gotchas
 - Examples and templates
+- Assets
 - Scripts
 - Words
 - What to leave out
@@ -70,6 +71,20 @@ Facts that defy a reasonable assumption are often the most valuable lines in a s
 - Copy examples from working code or tests; never invent one. An invented helper or parameter is the most common failure the validation step finds.
 - An example is complete: the agent can paste it and fill the marked values.
 - Environment values in examples are bundle variables or widgets, never literals.
+
+## Assets
+
+Decide per template, at Map, and record the decision in the inventory's "Shared helpers and templates" table:
+
+| Situation | Do | Why |
+| --- | --- | --- |
+| The repo already has a template people copy (a setup notebook, a deployment script template) | Name it by path at the step that uses it, and list it in the skill's `sources` | A copy in `assets/` would drift from the original; the source entry makes the freshness check notice when it changes |
+| The same, but the task can start outside the repo (SQL editor, a new notebook, no repo file open) | Copy it into `assets/`, with the repo file in `sources` | Without an open repo file the agent may not find the original |
+| No template exists, but people produce the same shape again and again: notebook skeleton, job or bundle YAML, deployment script, PR description | Build an asset from two or three real examples, with the parts to fill marked `<like_this>` | The agent copies a known-good shape instead of inventing one |
+| A small step the agent gets wrong by reasoning (deriving a path from widgets, listing a job's last runs) | A script in `scripts/` (next section) | Rare; most skills need none |
+| Anything else | No asset | |
+
+Every asset is linked from the step that uses it, with what may change in it. Keep an asset only if the evals show it helps; lint compiles Python assets and parses YAML and JSON assets.
 
 ## Scripts
 

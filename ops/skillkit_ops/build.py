@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from .model import REPO_ONLY, Skill, Standard, parse_skill_md, workspace_instructions_path
+from skillkit.model import REPO_ONLY, Skill, Standard, parse_skill_md, workspace_instructions_path
 
 
 def _git_sha(root: Path) -> str:

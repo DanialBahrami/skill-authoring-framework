@@ -8,7 +8,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from .model import Skill
+from skillkit.model import Skill
 
 
 def glob_to_regex(pattern: str) -> re.Pattern[str]:

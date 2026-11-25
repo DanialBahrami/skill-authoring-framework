@@ -48,7 +48,7 @@ steps:
     workingDirectory: $(Pipeline.Workspace)/s/genie-context
 
   - script: |
-      CHANGED=$(skillkit changed --base origin/$(System.PullRequest.TargetBranchName))
+      CHANGED=$(skillkit-ops changed --base origin/$(System.PullRequest.TargetBranchName))
       echo "Changed skills: ${CHANGED:-none}"
       echo "##vso[task.setvariable variable=CHANGED_SKILLS]$CHANGED"
     displayName: Find changed skills
@@ -82,7 +82,7 @@ steps:
       DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
       DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
 
-  - script: python pipelines/azure-devops/scripts/post_pr_comment.py $(Build.ArtifactStagingDirectory)/eval-report.md
+  - script: python ops/pipelines/azure-devops/scripts/post_pr_comment.py $(Build.ArtifactStagingDirectory)/eval-report.md
     displayName: Post eval report on the PR
     condition: and(always(), ne(variables['CHANGED_SKILLS'], ''))
     workingDirectory: $(Pipeline.Workspace)/s/genie-context

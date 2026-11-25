@@ -1,6 +1,6 @@
 # Genie Code context standard
 
-Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` so they can be tuned without editing this file. "Platform team" means the team that owns the context repo and the workspace instructions; "owning team" means the team registered for a skill's prefix. The README describes the meta-skill that drafts this context; `docs/operating.md` describes running it at scale.
+Every piece of Genie Code context in your organisation follows this standard. It builds on the open Agent Skills specification and the AGENTS.md format, and is stricter where a shared workspace needs it. `skillkit lint` enforces the checkable parts; reviewers enforce the rest. Limits live in `standard.yaml` (the meta-skill's defaults, overridden by a `standard.yaml` in the output folder) so they can be tuned without editing this file. "Platform team" means the team that owns the shared conventions and the workspace instructions; "owning team" means the team registered for a skill's prefix. The README describes the meta-skill that drafts this context; `ops/operating.md` describes running it at scale.
 
 ## 1. What goes where
 
@@ -81,7 +81,7 @@ Required sections, in this order: `## Steps` (numbered, imperative) and `## Veri
 
 Each skill carries `evals/evals.json` with at least two `trigger` cases and one `near_miss` case; more are expected for active skills (the Agent Skills guide suggests about 20 trigger queries, half near misses). Trigger cases state observable results with `must_include`, `must_not_include` and `assertions`; cases list the `AGENTS.md` files Genie Code would have loaded.
 
-`skillkit eval` runs, for every case and `--runs` times: a routing test (the model sees every skill in the repo that is not deprecated, drafts included, optionally the skills installed in the workspace, plus decoys for built-in skills, and picks a skill; passes on a trigger rate of 0.5; only the skills named are scored), and for trigger cases an answer test with the skill and without it (passes on a majority of runs). Skills in `uses` are available in both arms, so a workflow is measured against its building blocks. The report shows the extra tokens per answer the skill costs. The verdict per skill:
+`skillkit eval` runs, for every case and `--runs` times: a routing test (the model sees every skill in the output folder that is not deprecated, drafts included, optionally the skills installed in the workspace, plus decoys for built-in skills, and picks a skill; passes on a trigger rate of 0.5; only the skills named are scored), and for trigger cases an answer test with the skill and without it (passes on a majority of runs). Skills in `uses` are available in both arms, so a workflow is measured against its building blocks. The report shows the extra tokens per answer the skill costs. The verdict per skill:
 
 - **ADDS VALUE**: every case passes, and at least one passes only with the skill. Required to merge.
 - **NO EFFECT**: the model already gets it right. Do not merge; move any single useful rule to `AGENTS.md`.
@@ -90,7 +90,7 @@ Each skill carries `evals/evals.json` with at least two `trigger` cases and one 
 
 Every expected behaviour in a case must be achievable without running anything: the model describes what it would do.
 
-With a development SQL warehouse or a notebook's Spark session, `--execute` adds an execution gate: the SQL in each answer is planned with `EXPLAIN`, tables in the development catalog get `DESCRIBE TABLE`, and Python and YAML blocks are syntax-checked; anything that fails fails the run. Only `EXPLAIN` and `DESCRIBE TABLE` are sent. Evals and builds refuse to run while `context/workspace-instructions.md` is still the framework's example. A skill that uses other skills has a journey in `evals/journeys.json`, a task that needs the whole chain; `skillkit eval` runs the journeys that involve the skills it evaluates.
+With a development SQL warehouse or a notebook's Spark session, `--execute` adds an execution gate: the SQL in each answer is planned with `EXPLAIN`, tables in the development catalog get `DESCRIBE TABLE`, and Python and YAML blocks are syntax-checked; anything that fails fails the run. Only `EXPLAIN` and `DESCRIBE TABLE` are sent. Evals inject the workspace instructions Genie Code would load: the live file, or the context repo's Git copy when there is one; they refuse to run while that copy is still the framework's example. A skill that uses other skills has a journey in `evals/journeys.json`, a task that needs the whole chain; `skillkit eval` runs the journeys that involve the skills it evaluates.
 
 The PR pipeline runs this for changed skills (3 runs) and, for coexistence, the routing test for every active skill, and posts the report on the PR. During the pilot the eval gate is advisory; it becomes blocking once the suite is stable. Before activating a new skill, the author also runs two cases in a real Genie Code Agent-mode chat (`skillkit genie-checklist`) and notes the outcome in the PR.
 
@@ -102,7 +102,7 @@ Security: the linter warns on scripts, network calls, external URLs and paths ou
 
 Freshness is checked in three ways:
 
-- **Source change.** A source repo's PR build runs `skillkit freshness` and comments on the PR with the affected skills and owners.
+- **Source change.** A source repo's PR build runs `skillkit-ops freshness` and comments on the PR with the affected skills and owners.
 - **Doc change.** Docs kept in Git are repo sources and are caught by the source-change check. For Confluence, the weekly pipeline compares recorded page versions with the live pages. Other doc pages are covered by the age check.
 - **Age.** The weekly pipeline fails for active skills not reviewed within the period in `standard.yaml`.
 

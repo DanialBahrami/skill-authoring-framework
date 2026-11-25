@@ -13,7 +13,7 @@ Three checks, in order: the output follows the contract, every name in it is rea
 
 ## 1. Contract
 
-With `skillkit`: `skillkit lint` (no names, so the catalog, journey and dependency checks run too) and fix every error. SK023 warns about assertions a model cannot satisfy without running anything ("names the latest release branch", "lists the existing tables"); rewrite them to expect the query or the step. Warnings marked SK020 (scripts, network calls, external URLs) go to the human reviewer.
+With the scripts (see SKILL.md, "Limits and tooling"): `lint` (no names, so the catalog, journey and dependency checks run too) and fix every error. SK023 warns about assertions a model cannot satisfy without running anything ("names the latest release branch", "lists the existing tables"); rewrite them to expect the query or the step. Warnings marked SK020 (scripts, network calls, external URLs) go to the human reviewer.
 
 Without it, check by hand and write the result in `summary.md`:
 
@@ -34,11 +34,11 @@ Without it, check by hand and write the result in `summary.md`:
 
 For every helper, template, table, column, widget, parameter and command in the generated files, find it in the source repo (or the doc it came from). Fix or remove anything that is not there. This catches most invented content, and evals do not: a confident wrong name can still pass a rubric.
 
-With `skillkit`: `skillkit check-names <names> --repo <source repo checkout>` looks up every inline code span in the skill and its references, as a file or folder name and in file contents, and lists what it cannot find. Placeholders (`<table>`, `YYYY.MM.DD`) and commands with arguments are skipped. Treat the list as questions, not errors: a value the user types or a workspace group legitimately appears in no file; pass those with `--ignore` so the list stays short.
+`check-names <names> --repo <source repo checkout>` looks up every inline code span in the skill and its references, as a file or folder name and in file contents, and lists what it cannot find. Placeholders (`<table>`, `YYYY.MM.DD`) and commands with arguments are skipped. Treat the list as questions, not errors: a value the user types or a workspace group legitimately appears in no file; pass those with `--ignore` so the list stays short.
 
 ## 3. Evals
 
-`skillkit eval <names> --runs 3` runs each case with and without the skill and reports a verdict per skill. Routing always uses every skill in the repo that is not deprecated, drafts included, so a near miss can go to a sibling skill that is not being evaluated; add `--installed <folder>` to include skills already installed in the workspace.
+`eval <names> --runs 3` runs each case with and without the skill and reports a verdict per skill. Each answer gets the workspace instructions Genie Code would load: the live `/Workspace/.assistant_workspace_instructions.md`, or the output folder's `context/workspace-instructions.md` when it is a context repo. Routing always uses every skill in the output folder that is not deprecated, drafts included, so a near miss can go to a sibling skill that is not being evaluated; add `--installed <folder>` to include skills already installed in the workspace (when `catalog.installed_skills: use`).
 
 | Verdict | Meaning | Action |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ With `skillkit`: `skillkit check-names <names> --repo <source repo checkout>` lo
 
 **Execution gate.** Rubrics and regexes see whether code looks right, not whether it runs. Add `--execute` with a development SQL warehouse (`--warehouse-id <id>`), or run it from a notebook to use the active Spark session, and `--sql-var catalog=<dev catalog>` for the variables the skills use. The gate plans every query and DML statement in an answer with `EXPLAIN`, runs `DESCRIBE TABLE` on every fully qualified table in the development catalog (`MERGE` and `ALTER` targets too), compiles Python blocks and parses YAML blocks. An invented table or column, or a syntax error, fails the case even when the rubric passed. Only `EXPLAIN` and `DESCRIBE TABLE` are sent, and both read metadata, never rows. Tables the answer creates are skipped; for a source that is not onboarded yet, list its tables as regexes in the case's `exec_new_tables`. Use an identity that can only read the development catalog.
 
-**Journeys.** `evals/journeys.json` holds tasks that span several skills. `skillkit eval` runs the journeys that involve the skills under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. This shows whether the skills hand over (names, tables and parameters line up). It cannot show whether Genie Code loads a skill named in another skill's steps; the journeys in the Genie Code check do.
+**Journeys.** `evals/journeys.json` holds tasks that span several skills. `eval` runs the journeys that involve the skills under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. This shows whether the skills hand over (names, tables and parameters line up). It cannot show whether Genie Code loads a skill named in another skill's steps; the journeys in the Genie Code check do.
 
 Before fixing a failing case, check that it is achievable: the eval model cannot run anything, so a case that expects real results (actual table lists, today's branch name) fails for every skill. Rewrite it to expect what the agent would do.
 
@@ -61,7 +61,7 @@ Without `skillkit`, say in the summary that no evals ran and do step 4 for every
 
 Evals call a model through a serving endpoint; they are not Genie Code itself. Before a skill becomes `active`:
 
-`skillkit genie-checklist <names> --out <run folder>/genie-check.md` writes the prompts to paste and what to look for in each answer, taken from the eval cases.
+`genie-checklist <names> --out <run folder>/genie-check.md` writes the prompts to paste and what to look for in each answer, taken from the eval cases.
 
 1. Install the draft as a personal skill (`/Workspace/Users/<you>/.assistant/skills/<name>/`).
 2. In a new Agent-mode thread, open a file in the folder the task belongs to and give two of the skill's trigger prompts, worded as a user would.

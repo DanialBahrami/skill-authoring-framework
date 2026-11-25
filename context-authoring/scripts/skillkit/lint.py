@@ -2,7 +2,7 @@
 
 Each finding has a code so reviewers and docs can refer to it:
 
-  SK001-SK023  one skill
+  SK001-SK024  one skill
   CT001-CT004  the catalog of skills
   WI001-WI003  workspace instructions
   AG001-AG002  AGENTS.md files
@@ -14,6 +14,8 @@ import datetime as dt
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+import yaml
 
 from .model import (
     EVALS_FILE,
@@ -109,7 +111,7 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
     if len(skill.name) > std.limit("name_max_chars"):
         _err(out, "SK003", where, f"name is longer than {std.limit('name_max_chars')} characters")
     team = std.team_for_prefix(skill.name)
-    if team is None:
+    if team is None and std.prefixes:   # no prefixes configured: any prefix is fine
         _err(out, "SK004", where, f"prefix '{skill.name.split('-', 1)[0]}' is not registered in standard.yaml")
 
     desc = skill.description
@@ -224,7 +226,7 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
             ref = var.get("reference", "")
             if not (skill.path / ref).is_file():
                 _err(out, "SK016", where, f"variants[{i}] reference '{ref}' does not exist")
-            if var.get("owner") not in std.teams:
+            if std.teams and var.get("owner") not in std.teams:
                 _err(out, "SK016", where, f"variants[{i}] owner '{var.get('owner')}' is not a team in standard.yaml")
             if ref and ref not in _local_links(skill.body):
                 _err(out, "SK016", where, f"variant reference '{ref}' must be linked from SKILL.md with the condition that selects it")
@@ -268,6 +270,8 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
         allowed = {"SKILL.md", "skill.yaml", "evals", "references", "assets", "scripts"}
         if child.name not in allowed:
             _err(out, "SK018", where, f"'{child.name}' is not part of the skill layout")
+
+    out += lint_assets(skill)
 
     # Security review signals (warnings: they need a reviewer, not a rejection)
     if (skill.path / "scripts").is_dir() and any((skill.path / "scripts").rglob("*")):
@@ -410,6 +414,44 @@ def lint_agents_md(path: Path, std: Standard) -> list[Finding]:
         match = pattern.search(text)
         if match:
             _err(out, "AG002", where, f"contains {label}: '{match.group(0)}'")
+    return out
+
+
+ASSET_PLACEHOLDER_RE = re.compile(r"<[A-Za-z_][\w -]*>|\{\{[^}]*\}\}")
+
+
+def lint_assets(skill: Skill) -> list[Finding]:
+    """SK024: asset templates must be valid. Python is compiled (notebook magics dropped), YAML and
+    JSON are parsed. Placeholders such as <table_name> or {{var}} are filled with a dummy first."""
+    import json
+    import textwrap
+
+    out: list[Finding] = []
+    base = skill.path / "assets"
+    if not base.is_dir():
+        return out
+    for path in sorted(p for p in base.rglob("*") if p.is_file()):
+        where = f"skills/{skill.name}/{path.relative_to(skill.path).as_posix()}"
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        filled = ASSET_PLACEHOLDER_RE.sub("placeholder_value", text)
+        suffix = path.suffix.lower()
+        try:
+            if suffix == ".py":
+                lines = [ln for ln in textwrap.dedent(filled).splitlines() if not ln.lstrip().startswith(("%", "!"))]
+                compile("\n".join(lines), str(path), "exec")
+            elif suffix in (".yml", ".yaml"):
+                yaml.safe_load(filled)
+            elif suffix == ".json":
+                json.loads(filled)
+        except SyntaxError as exc:
+            _err(out, "SK024", where, f"Python does not compile: {exc.msg} (line {exc.lineno})")
+        except yaml.YAMLError as exc:
+            _err(out, "SK024", where, f"YAML does not parse: {str(exc).splitlines()[0]}")
+        except ValueError as exc:
+            _err(out, "SK024", where, f"JSON does not parse: {exc}")
     return out
 
 

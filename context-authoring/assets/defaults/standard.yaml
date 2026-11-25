@@ -1,33 +1,15 @@
-# Tunable parts of the Genie Code context standard (docs/STANDARD.md).
-# skillkit reads this file; change limits here, not in code.
-# The team who owns the context repo (the "platform team") approves changes to this file.
+# Defaults for the meta-skill's scripts, used when the output folder has no standard.yaml.
+# To change a value, put a standard.yaml in the output folder with just the keys you change;
+# it is merged over these defaults. ops/standard.example.yaml shows a full team setup.
 
 version: 1
 
-platform_team: data-platform   # owns the context repo, workspace instructions and this file
+platform_team: ""
 
-# EXAMPLE VALUES: replace teams, prefixes and reviewer groups with your own.
-# `codeowners` is the GitHub team for CODEOWNERS; `reviewers` the Azure DevOps group
-# for branch policies. `skillkit reviewers` prints either.
-teams:
-  data-platform:
-    name: Data Platform
-    codeowners: "@my-org/data-platform"
-    reviewers: "[MyProject]\\Data Platform Team"
-  forecasting:
-    name: Forecasting
-    codeowners: "@my-org/forecasting"
-    reviewers: "[MyProject]\\Forecasting Team"
-  analytics:
-    name: Analytics
-    codeowners: "@my-org/analytics"
-    reviewers: "[MyProject]\\Analytics Team"
+# Teams and skill-name prefixes. Empty: any prefix is allowed and owners are not checked.
+teams: {}
 
-# Skill name prefix -> owning team. A skill named dp-... must be owned by data-platform.
-prefixes:
-  dp: data-platform
-  fc: forecasting
-  an: analytics
+prefixes: {}
 
 # Limits. The Agent Skills specification allows descriptions up to 1024 characters and
 # recommends bodies under 500 lines / 5000 tokens; ours are stricter because every
@@ -52,10 +34,10 @@ sections:
   optional: [Gotchas, Rules, Examples, References]
 
 catalog:
-  # Skills installed in the workspace outside this context repo: "use" counts them in the budget,
+  # Skills installed in the workspace outside the output folder: "use" counts them in the budget,
   # routing evals and overlap checks (with --installed); "ignore" leaves them out of runs entirely,
   # for organisations that treat other skill sets as out of scope.
-  installed_skills: use
+  installed_skills: ignore
   installed_folder: /Workspace/.assistant/skills
   overlap_warning: 0.5       # description word overlap (Jaccard) that triggers a coexistence warning
   max_dependency_depth: 2    # workflow -> block -> block at most
@@ -63,8 +45,7 @@ catalog:
 # Patterns that must not appear in skills (SKILL.md, references/, assets/, scripts/).
 # Environment-specific values belong in workspace instructions or bundle variables.
 forbidden_patterns:
-  - name: environment catalog name          # EXAMPLE: replace with your catalog names
-    regex: '\blakehouse_(dev|stg|prd)\b'
+  # Add your environment catalog names, e.g. regex: '\bmycatalog_(dev|stg|prd)\b'
   - name: workspace host                    # AWS, Azure and GCP workspace URLs
     regex: '[\w.-]+\.(cloud\.databricks\.com|azuredatabricks\.net|gcp\.databricks\.com)'
   - name: email address

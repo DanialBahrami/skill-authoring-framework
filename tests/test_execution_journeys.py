@@ -159,7 +159,8 @@ def test_example_instructions_block_evals_and_build(repo: Path, capsys):
                for f in lint.lint_workspace_instructions(wi, load_standard(repo)))
     with pytest.raises(SystemExit, match="still the framework's example"):
         main(["--root", str(repo), "eval"])
-    assert main(["--root", str(repo), "build", "--out", str(repo / "build")]) == 1
+    from skillkit_ops.cli import main as ops_main
+    assert ops_main(["--root", str(repo), "build", "--out", str(repo / "build")]) == 1
     assert "build refused" in capsys.readouterr().err
 
 

@@ -1,8 +1,14 @@
-"""Load the repo: standard.yaml, skills, workspace instructions."""
+"""Load the output folder: standard.yaml (merged over the skill's defaults), skills, instructions.
+
+The output folder is where the meta-skill writes skills, evals and run files. It needs nothing to
+start: without a standard.yaml the defaults in the skill's assets/defaults/ apply.
+"""
 
 from __future__ import annotations
 
 import datetime as dt
+import functools
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +22,29 @@ EVALS_FILE = "evals/evals.json"              # Agent Skills convention
 STATUSES = ("draft", "active", "deprecated")
 SPEC_FRONTMATTER = ("name", "description", "license", "compatibility", "metadata", "allowed-tools")
 
+@functools.lru_cache(maxsize=1)
+def skill_root() -> Path:
+    """The context-authoring skill folder, for its defaults and templates. Run from inside the skill
+    (the usual case) it is two levels up from this file; when skillkit is pip-installed elsewhere,
+    set SKILLKIT_SKILL_DIR or run from a folder that contains context-authoring/."""
+    env = os.environ.get("SKILLKIT_SKILL_DIR")
+    candidates = [Path(env)] if env else []
+    candidates.append(Path(__file__).resolve().parents[2])
+    here = Path.cwd().resolve()
+    candidates += [d / "context-authoring" for d in (here, *here.parents)]
+    for c in candidates:
+        if (c / "SKILL.md").is_file() and (c / "assets" / "defaults").is_dir():
+            return c
+    raise FileNotFoundError("context-authoring skill folder not found; set SKILLKIT_SKILL_DIR to it")
+
+
+def defaults_dir() -> Path:
+    return skill_root() / "assets" / "defaults"
+
+
+def templates_dir() -> Path:
+    return skill_root() / "assets" / "templates"
+
 _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?(.*)\Z", re.S)
 
 
@@ -25,12 +54,13 @@ def estimate_tokens(text: str) -> int:
 
 
 def find_repo_root(start: Path | None = None) -> Path:
-    """Walk up from `start` to the folder that holds standard.yaml."""
+    """The output folder: walk up from `start` to a folder with a standard.yaml or a skills/ folder;
+    if there is none, `start` itself (a new, empty output folder)."""
     here = (start or Path.cwd()).resolve()
     for candidate in (here, *here.parents):
-        if (candidate / "standard.yaml").is_file():
+        if (candidate / "standard.yaml").is_file() or (candidate / "skills").is_dir():
             return candidate
-    raise FileNotFoundError("standard.yaml not found; run skillkit inside the genie-context repo or pass --root")
+    return here
 
 
 @dataclass
@@ -88,8 +118,20 @@ class Standard:
         return self.workspace.get("manifest_path", "/Workspace/.assistant/genie-context-manifest.json")
 
 
+def _merge(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    for key, value in over.items():
+        out[key] = _merge(out[key], value) if isinstance(value, dict) and isinstance(out.get(key), dict) else value
+    return out
+
+
 def load_standard(root: Path) -> Standard:
-    return Standard(yaml.safe_load((root / "standard.yaml").read_text(encoding="utf-8")) or {})
+    """The skill's defaults, with the output folder's standard.yaml (if any) merged over them."""
+    raw = yaml.safe_load((defaults_dir() / "standard.yaml").read_text(encoding="utf-8")) or {}
+    own = root / "standard.yaml"
+    if own.is_file():
+        raw = _merge(raw, yaml.safe_load(own.read_text(encoding="utf-8")) or {})
+    return Standard(raw)
 
 
 @dataclass
@@ -256,7 +298,24 @@ def load_skills(root: Path, names: list[str] | None = None) -> list[Skill]:
 
 
 def workspace_instructions_path(root: Path) -> Path:
+    """The Git copy of the workspace instructions; exists only when the output folder is run as a
+    context repo with ops/ (where Git is the master copy and the pipeline deploys it)."""
     return root / "context" / "workspace-instructions.md"
+
+
+def instructions_for_evals(root: Path) -> tuple[str, str]:
+    """(text, where) of the workspace instructions evals should inject: the Git copy when the output
+    folder has one (it is what will be deployed), otherwise the live file Genie Code loads."""
+    copy = workspace_instructions_path(root)
+    if copy.is_file():
+        return copy.read_text(encoding="utf-8"), copy.as_posix()
+    live = Path(load_standard(root).workspace.get("instructions_path", "/Workspace/.assistant_workspace_instructions.md"))
+    try:
+        if live.is_file():
+            return live.read_text(encoding="utf-8"), live.as_posix()
+    except OSError:
+        pass
+    return "", "none"
 
 
 EXAMPLE_MARKER = "<!-- EXAMPLE"

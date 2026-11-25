@@ -1,6 +1,6 @@
 # Conflict report template (conflicts.md)
 
-One row per difference. Decisions are made by the team that owns the context repo (the platform team) and the owning team together; record who decided. The two rows below are examples.
+One row per difference. Decisions are made by the platform team (who owns the shared conventions) and the owning team together; record who decided. The two rows below are examples.
 
 | # | Task or topic | Where | Approach A (source) | Approach B (source) | Breaks the contract? | Suggested decision | Reason | Decision | Decided by |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -40,7 +40,7 @@ jobs:
         id: stale
         continue-on-error: true
         working-directory: genie-context
-        run: skillkit stale | tee stale.txt
+        run: skillkit-ops stale | tee stale.txt
 
       - name: Changed Confluence sources
         id: confluence
@@ -51,7 +51,7 @@ jobs:
           CONFLUENCE_BASE_URL: ${{ secrets.CONFLUENCE_BASE_URL }}
           CONFLUENCE_TOKEN: ${{ secrets.CONFLUENCE_TOKEN }}
           CONFLUENCE_EMAIL: ${{ secrets.CONFLUENCE_EMAIL }}
-        run: skillkit confluence-check | tee confluence.txt
+        run: skillkit-ops confluence-check | tee confluence.txt
 
       - name: Regression eval (all active skills)
         id: eval
@@ -77,7 +77,7 @@ jobs:
       - name: Fail if any check found work
         if: steps.stale.outcome == 'failure' || steps.confluence.outcome == 'failure' || steps.eval.outcome == 'failure'
         run: |
-          echo "stale.txt      -> owner re-checks the skill: skillkit reviewed <name>, update, or deprecate"
-          echo "confluence.txt -> owner runs update mode, then skillkit confluence-check <name> --write"
+          echo "stale.txt      -> owner re-checks the skill: skillkit-ops reviewed <name>, update, or deprecate"
+          echo "confluence.txt -> owner runs update mode, then skillkit-ops confluence-check <name> --write"
           echo "eval-report.md -> owner reads the failing answer and fixes the skill or the case"
           exit 1

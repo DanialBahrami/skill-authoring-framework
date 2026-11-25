@@ -7,13 +7,13 @@ steps:
     inputs: { versionSpec: "3.11" }
   - script: pip install -e ".[databricks]"
     displayName: Install skillkit
-  - script: skillkit deploy --build $(Pipeline.Workspace)/bundle --dry-run ${DEPLOY_FLAGS:-}
+  - script: skillkit-ops deploy --build $(Pipeline.Workspace)/bundle --dry-run ${DEPLOY_FLAGS:-}
     displayName: Plan
     env:
       DATABRICKS_HOST: $(DATABRICKS_HOST)
       DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
       DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
-  - script: skillkit deploy --build $(Pipeline.Workspace)/bundle ${DEPLOY_FLAGS:-}
+  - script: skillkit-ops deploy --build $(Pipeline.Workspace)/bundle ${DEPLOY_FLAGS:-}
     displayName: Deploy
     env:
       DATABRICKS_HOST: $(DATABRICKS_HOST)
