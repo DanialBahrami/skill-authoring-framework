@@ -1,9 +1,9 @@
 # AGENTS.md — <repo name>
 
-<!-- Loaded by Genie Code whenever a file in this repo is open. Keep it under 300 lines.
+<!-- Loaded by the coding agent whenever a file in this repo is open. Keep it under 300 lines.
      Repo facts only: what lives where, vocabulary, conventions every task needs.
-     Task procedures go in skills; always-true workspace rules go in workspace instructions;
-     facts about tables go in Unity Catalog comments. Owner: <team>. -->
+     Task procedures go in skills; always-true workspace rules go in the always-on instructions;
+     facts about tables go in catalog comments. Owner: <team>. -->
 
 ## What this repo is
 

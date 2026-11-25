@@ -350,7 +350,7 @@ def warehouse_runner(warehouse_id: str, profile: str | None = None, timeout: str
 
 
 def spark_runner() -> Runner:
-    """A runner on the notebook's active Spark session, for running the gate from Genie Code
+    """A runner on the notebook's active Spark session, for running the gate from an agent in a notebook
     without a SQL warehouse. Statements run as the notebook user."""
     try:
         from pyspark.sql import SparkSession

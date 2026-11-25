@@ -44,99 +44,39 @@ Done once by the platform team. Step 7 must happen before the first deploy, beca
 
 The meta-skill (see the [README](../README.md)) drafts context; this is the review process around it in the `genie-context` repo.
 
-1. Branch the context repo and run the meta-skill in create or update mode.
-2. Decide the conflicts it lists, after the [review checkpoint](../context-authoring/references/review-checkpoint.md): accept its suggestions in one reply or decide row by row; contract-breaking rows always by number.
-3. Review every generated file as the owner: replace `TODO`s, narrow the `sources` globs to the files the skill really depends on.
-4. Run `skillkit lint`, `skillkit check-names <names> --repo <source checkout>` and `skillkit eval <names> --runs 3 --repos-root <folder with source checkouts>`.
-5. Check two prompts per skill in a real Genie Code Agent-mode chat with the skill installed in your user folder; `skillkit genie-checklist <names>` writes the prompts and what to look for.
-6. Set `status: active` for skills with an ADDS VALUE verdict; others can merge as `draft`.
-7. Open the PR with `summary.md`; the pipeline posts lint results and the eval report; the owning team and the platform team review with the checklist in `docs/STANDARD.md`. The author cannot approve.
-8. Send the proposals to their owners: a person writes `AGENTS.md` from the candidate lines (or edits the drafts in `<run folder>/agents-md/`, if they were asked for) and checks it with `skillkit eval-context`, using `--agents-drafts <run folder>/agents-md` to test drafts before they are merged; instruction changes go to the platform team; Unity Catalog comments to data owners.
+1. Branch the context repo and run the meta-skill for a new scope, or for one skill and its trigger. It runs every step and ends with `skillkit check`, which writes lint, names, evals, the skill map and the Genie Code checklist into the run's `report.md`.
+2. Review `report.md`: accept or change the decisions in `decisions.md`, spot-check `inventory.md`, and send `proposals.md` to its owners. Changed decisions are applied by a run about the affected skills.
+3. As the owner, replace `TODO`s and narrow the `sources` globs to the files each skill really depends on; run `skillkit check <run folder> --repo <source checkout>` again after edits.
+4. Try two prompts per skill in a real Genie Code Agent-mode chat with the skill in your user folder, from the checklist in `report.md`.
+5. Set `status: active` for skills with an ADDS VALUE verdict; others can merge as `draft`.
+6. Open the PR with `report.md` as its description; the pipeline posts lint results and the eval report. The owning team and the platform team review with the checklist in [the standard](../context-authoring/references/standard.md#8-review-checklist). The author cannot approve.
+7. A person writes `AGENTS.md` from the candidate lines and checks it with `skillkit eval-context`; instruction changes go to the platform team, Unity Catalog comments to data owners.
 
 A hand-written skill starts with `skillkit new <name>` and continues from step 3.
 
 ## 3. Evals
 
-`skillkit eval` decides whether a skill merges. It simulates Genie Code through Databricks model serving endpoints and runs nothing in the workspace.
+How evals work, how to write cases and journeys, the verdicts and the execution gate are in [references/evals.md](../context-authoring/references/evals.md). In a context repo, three things are added:
 
-**Case format** (`evals/evals.json`, the Agent Skills layout plus extensions):
+**Advisory or blocking.** During a pilot, run the PR gate in advisory mode (`EVAL_GATE=advisory`): failures show as warnings and reviewers decide. Switch to `blocking` once your eval cases are stable; then a FAILING, INCONCLUSIVE or NO EFFECT verdict fails the PR.
 
-```json
-{
-  "skill_name": "dp-create-silver-table",
-  "evals": [
-    {
-      "id": "silver-01",
-      "type": "trigger",
-      "prompt": "Create the silver table and notebook for nordics_bronze.crm_contract_account",
-      "agents": ["data-platform/AGENTS.md"],
-      "must_include": ["merge_template", "COMMENT\\s+'UQ'"],
-      "must_not_include": ["\\blakehouse_(dev|stg|prd)\\b", "(?m)^\\s*MERGE\\s+INTO"],
-      "assertions": ["Creates the global_silver twin partitioned by region_key"]
-    },
-    { "id": "nm-01", "type": "near_miss", "prompt": "Add a column to an existing silver table" }
-  ]
-}
-```
+**Coexistence.** When any skill changes, the PR pipeline reruns routing for **every** active skill (`skillkit eval --mode routing`), so a new description cannot steal prompts from existing ones. `skillkit-ops changed` also returns every skill that uses a changed skill, so those are re-evaluated.
 
-At least two `trigger` cases and one `near_miss`; more are expected for active skills. Every expectation must be achievable without running anything: the model describes what it would do, so expect the query that lists the downstream tables, not the tables.
+**`AGENTS.md` is evaluated too.** `skillkit eval-context --cases evals/agents.json --repos-root ~/repos` runs the same prompts with and without the `AGENTS.md` files (a cases file in the format of `evals.json`, with `agents` paths). Add `--agents-drafts <folder>` to evaluate drafts before they reach the source repo.
 
-**What runs:**
+**Workspace instructions.** In a context repo, `context/workspace-instructions.md` is the master copy: evals inject it instead of the live file, and the pipeline deploys it. Evals and the build refuse to run while it still holds the framework's example.
 
-| Test | Model sees | Passes when |
-| --- | --- | --- |
-| Routing (every case) | Every skill in the repo that is not deprecated (drafts included), skills installed in the workspace with `--installed` (minus those a repo skill supersedes; only when `catalog.installed_skills: use`), decoys for built-in skills. Only the named skills are scored | Trigger: picks this skill at a rate ≥ 0.5 over `--runs`. Near miss: does not |
-| Answer with skill (trigger cases) | Workspace instructions, the case's `AGENTS.md` files, skills in `uses`, the skill | Every `must_include` matches, no `must_not_include` matches, the judge passes every assertion — on a majority of runs |
-| Answer without skill | The same minus the skill | Same scoring: the baseline |
-
-The judge is a second model from a different family (set in `standard.yaml`). The report also shows the extra tokens per answer each skill costs.
-
-| Verdict | Meaning | Action |
-| --- | --- | --- |
-| **ADDS VALUE** | All cases pass, and at least one passes only with the skill | Activate and merge |
-| **NO EFFECT** | The model already gets it right | Don't merge; move one useful rule to `AGENTS.md` or drop it |
-| **FAILING** | A routing or answer case fails | Inspect with `--inspect <case-id>`; fix the skill, its description or the case |
-| **INCONCLUSIVE** | Answers were cut off at the token limit (reported per case as "cut off"); fails the run, since nothing was verified | Set `eval: max_tokens` in the skill's `skill.yaml` (default `eval.max_tokens` in `standard.yaml`) and run again |
-
-**Execution gate (optional).** Rubrics see whether code looks right; the gate checks it against the development workspace without running it. With `--execute --warehouse-id <dev warehouse>` (or `EVAL_WAREHOUSE_ID` in the pipelines; in a notebook without a warehouse, the active Spark session):
-
-- every query and DML statement in an answer (```sql blocks and `spark.sql(...)` calls) is planned with `EXPLAIN`, including the query part of `CREATE ... AS SELECT` and temp views;
-- every fully qualified table in a development catalog gets `DESCRIBE TABLE`, including `MERGE`, `INSERT` and `ALTER` targets. The catalogs are `eval.execution.catalogs` in `standard.yaml`, or by default the values of the SQL variables, so `alias.struct.field` is never mistaken for a table;
-- Python blocks are compiled (syntax only) and YAML blocks parsed, locally.
-
-Only `EXPLAIN` and `DESCRIBE TABLE` are ever sent; both read metadata, never rows. Variables the skills use (`${catalog}`, `{{catalog}}`, `{catalog}`, `:catalog`) are filled from `eval.execution.variables` or `--sql-var name=value`. A statement that does not plan, a table that does not exist, or a syntax error fails the run. Missing permissions, unbound parameters and unqualified names that may be temp views defined elsewhere are inconclusive. Tables the answer creates, or that match the case's `exec_new_tables` regexes (a source not onboarded yet), are skipped, and so are columns the answer adds with `ALTER TABLE ... ADD COLUMN(S)` or the case lists in `exec_new_columns`. Tables a PySpark answer creates (`saveAsTable`, `toTable`, `tableName`, `@dlt.table(name=…)`) count as created too. Variables also fill the legacy widget syntax `$name`; YAML excerpts that start indented are not checked on their own. DDL, grants and statements with placeholders are not checked, and PySpark DataFrame code is checked for syntax only.
-
-**Journeys.** `evals/journeys.json` holds tasks that span several skills (template: `context-authoring/assets/templates/journeys.json`). `skillkit eval` runs every journey that involves a skill under evaluation: routing must pick the first skill, and the answer, with all the journey's skills loaded, must pass its checks. A failing journey fails the eval. Each journey also runs without any skill: one that passes then too is reported, because its checks do not test the skills. Because the simulation loads all skills up front, it shows whether skills hand over, not whether Genie Code loads a skill named in another skill's steps; the journeys section of `skillkit genie-checklist` covers that in a real chat.
-
-**Repeat runs.** Results are cached per case in `.skillkit-cache/` (git-ignored), keyed by everything that can change them: prompts, skill text, context, catalog, model, judge, limits and runs. A repeat run with `--runs 3` therefore re-runs only the cases whose inputs changed. `--refresh-failed` also re-runs failed and inconclusive cases; `--no-cache` ignores the cache.
-
-**Advisory or blocking.** During a pilot, run the PR gate in advisory mode (`EVAL_GATE=advisory`): failures show as warnings and reviewers decide. Switch to `blocking` once your eval cases are stable; then a FAILING or NO EFFECT verdict fails the PR.
-
-**Coexistence**: when any skill changes, the PR pipeline reruns routing for **every** active skill, so a new description cannot steal prompts from existing ones. The linter also warns when two descriptions overlap.
-
-**`AGENTS.md` is evaluated too**: `skillkit eval-context --cases evals/agents.json --repos-root ~/repos` (a cases file in the same format as a skill's `evals.json`, with `agents` paths) runs the same prompts with and without the `AGENTS.md` files. Add `--agents-drafts <run folder>/agents-md` to evaluate drafts before they reach the source repo. Research found generated context files slightly lowered agent success and raised cost by over 20%, while short human-written ones helped — so people write `AGENTS.md`, and it has to show it helps.
+Results are cached in `.skillkit-cache/` (git-ignored); `--refresh-failed` re-runs failed and inconclusive cases, `--no-cache` ignores the cache.
 
 ## 4. Multi-team repositories
 
-- The platform team defines a short **contract** in the repo's root `AGENTS.md`: the few rules every team must follow, for example naming, required columns, PII tagging, how schema changes ship. It applies in every folder.
-- Each team adds an `AGENTS.md` in its folder (template: `context-authoring/assets/templates/AGENTS.team.md`) that states its overrides explicitly.
-- A shared task stays **one skill**. When a team does it differently, step 1 names the condition (folder or schema) and links `references/<team>.md`, declared under `variants` with its owner. Two skills for the same task would compete for the same prompts.
-- A difference that breaks the contract is fixed in the code, never documented as a variant.
-- Ownership is enforced by required reviewers per path; `skillkit-ops reviewers` prints a CODEOWNERS file or Azure DevOps filters.
+The contract, team `AGENTS.md` files and variants are defined in [the standard](../context-authoring/references/standard.md#6-teams-variants-and-skills-that-use-skills). In a context repo, ownership is enforced by required reviewers per path: `skillkit-ops reviewers` prints a CODEOWNERS file or Azure DevOps filters, including variant reference files owned by another team.
 
 ## 5. Skills that use other skills
 
-Reuse is kept deliberately small. Most material shared between tasks is a convention, not a step, so it belongs in `AGENTS.md`, which loads once. The meta-skill decides shared material in this order:
+The rules (name the skill at the step, list it in `uses`, depth at most two, platform skills never use team skills) are in [the standard](../context-authoring/references/standard.md#6-teams-variants-and-skills-that-use-skills); lint enforces them.
 
-1. A rule, convention or vocabulary goes to `AGENTS.md` (or workspace instructions if it must hold outside the repo).
-2. A task people also ask for on its own is its own skill. Other skills name it at the step that needs it ("Ingest to Bronze: follow the `dp-configure-autoloader` skill with …") and list it in `uses`, without copying its steps.
-3. Anything else stays inside each skill that needs it. A few repeated lines cost less than a skill that must always load alongside.
-
-No skill exists only to be reused.
-
-**Checks.** The linter requires every skill named in a body to be listed in `uses` and vice versa; used skills must exist and be active; no cycles; depth at most 2; platform skills never use team skills. Evals run a skill with the skills it uses present, so the baseline measures its own value. When a skill changes, `skillkit-ops changed` also returns every skill that uses it, directly or through another skill, so the PR pipeline re-evaluates them.
-
-**Test it in your pilot.** Genie Code does not document whether it loads a skill because another skill names it. Build one workflow two ways, referencing the skills it uses and self-contained, and compare them with `skillkit eval`: did Genie load the referenced skills, which version passes more cases, and which costs fewer tokens. If referencing loses, keep workflows self-contained and treat `uses` as documentation.
+**Test it in your pilot.** Genie Code does not document whether it loads a skill because another skill names it. Build one workflow two ways, referencing the skills it uses and self-contained, and compare them with `skillkit eval` and in a real chat: did Genie load the referenced skills, which version passes more cases, and which costs fewer tokens. If referencing loses, keep workflows self-contained and treat `uses` as documentation.
 
 ## 6. Deployment
 
@@ -169,14 +109,16 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `ops/pi
 
 | Command | What it does |
 | --- | --- |
+| `init --scope S` | Starts a run: creates `authoring/runs/<date>-<scope>/` from the templates and lists the skills, decisions and backlog earlier runs left |
+| `check <run folder> [skills] [--repo R] [--repos-root D] [--runs N] [--no-eval]` | Lint, name check, evals (with the execution gate when `eval.execution.warehouse_id` is set), skill map and agent checklist, written into the run's `report.md`; skills default to those `decisions.md` marks as changed |
 | `lint [skills]` | Checks skills; with no names also catalog budget, overlap, dependencies and workspace instructions |
 | `lint-agents <files>` | Checks `AGENTS.md` files (size, no emails or tokens) |
 | `catalog [--installed DIR]` | Skills, status, owner, description tokens; active and planned (active + drafts, minus superseded) budget; with `--installed`, skills already in the workspace, their share of the budget and overlap with repo skills |
 | `catalog --map [--eval-json F] [--scope S] [--out F]` | The skill map: table and Mermaid diagram of skills, `uses`, journeys, team variants and eval verdicts |
 | `check-names [skills] --repo R [--repo R2] [--ignore N …] [--strict]` | Names in skills, their references and Markdown assets (inline code) that are not found in the source repos, as paths (globs allowed), file names or in contents |
-| `genie-checklist [skills] [--prompts N] [--out F]` | Prompts to paste in Genie Code and what to look for, per skill and per journey, with a no-file-open prompt and a "read repo files?" check |
+| `agent-checklist [skills] [--prompts N] [--out F]` | Prompts to paste into the real agent (Genie Code) and what to look for, per skill and per journey, with a no-file-open prompt and a "read repo files?" check |
 | `new <name> [--owner T]` | Scaffolds a draft skill; owner from the prefix, or `--owner` when no prefixes are configured |
-| `eval [skills]` | Routing and answer tests with baseline. `--mode all\|routing\|answer`, `--runs N`, `--threshold`, `--no-baseline`, `--require-value`, `--case-filter`, `--inspect ID`, `--repos-root`, `--agents-drafts DIR`, `--installed DIR`, `--no-cache`, `--refresh-failed`, `--no-journeys`, `--execute`, `--warehouse-id`, `--sql-var NAME=VALUE`, `--allow-example-instructions`, `--model`, `--judge`, `--out`, `--json` |
+| `eval [skills]` | Routing and answer tests with baseline. `--mode all\|routing\|answer`, `--runs N` (default `eval.runs`), `--threshold`, `--no-baseline`, `--require-value`, `--case-filter`, `--inspect ID`, `--repos-root`, `--agents-drafts DIR`, `--installed DIR`, `--no-cache`, `--refresh-failed`, `--no-journeys`, `--execute`, `--warehouse-id`, `--sql-var NAME=VALUE`, `--allow-example-instructions`, `--model`, `--judge`, `--out`, `--json` |
 | `eval-context --cases F [--repos-root D] [--agents-drafts D] [--execute …]` | Evaluates `AGENTS.md` files with and without them; drafts in `--agents-drafts` are used where present |
 | **skillkit-ops** | |
 | `build [--out]` | Lints, then bundles active skills and instructions with checksums |
@@ -188,30 +130,7 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `ops/pi
 | `confluence-check [skills] [--write]` | Compares recorded Confluence versions with the live pages |
 | `reviewers [--format codeowners\|azure-devops]` | Owners per path: a CODEOWNERS file (default) or Azure DevOps reviewer filters |
 
-**Lint codes**
-
-| Code | Checks |
-| --- | --- |
-| SK001–SK006 | `SKILL.md` exists; frontmatter fields; name pattern, folder match, registered prefix; description length and "Use when" |
-| SK007–SK009 | Body size; required and allowed sections |
-| SK010–SK012 | Links resolve; reference files don't link further; long references start with `## Contents` |
-| SK013 | No catalog names, hosts, emails, GUIDs, tokens or dated notes in deployed files |
-| SK014–SK016 | `skill.yaml` fields; `evals/evals.json` minimums and `trajectory` shape; variants |
-| SK017–SK019 | No `TODO` in active skills; no stray files; deprecated notice |
-| SK020 | Security review warnings: scripts, network calls, external URLs, paths outside the skill |
-| SK024 | Asset files: Python compiles, YAML and JSON parse |
-| SK025 | `## Recovery` is a symptom/cause/fix table with at least one row; no fix that only says to try again |
-| SK026 | A step that runs something (code block or inline command) has a `Check:` line (warning) |
-| SK027 | At least one trigger case has a `trajectory` (warning) |
-| SK021 | `uses` matches the skills named in the body; dependencies exist and are active |
-| SK022 | `supersedes`: not itself; the superseded repo skill is deprecated once this one is active |
-| SK023 | An assertion needs facts the model cannot know without running anything (warning) |
-| CT001–CT004 | Catalog budget (error for active skills, warning when active and drafts together exceed it); duplicate names; description overlap; dependency cycles, depth and direction |
-| JR001 | `evals/journeys.json`: unique ids, a prompt, at least two known skills that are not deprecated |
-| JR002 | Every skill in a journey is reachable from its first skill through `uses` (warning) |
-| WI004 | Workspace instructions are still the framework's example (warning; evals and build refuse) |
-| WI001–WI003 | Workspace instructions size, token budget, no emails or tokens |
-| AG001–AG002 | `AGENTS.md` size, no emails or tokens |
+**Lint codes** are listed in [the standard](../context-authoring/references/standard.md#9-lint-rules).
 
 ## 9. Configuration: standard.yaml
 
@@ -220,11 +139,12 @@ A merge to `main` touching `skills/`, `context/` or `standard.yaml` runs `ops/pi
 | `platform_team`, `teams`, `prefixes` | Who owns which skill prefix; each team's `codeowners` (GitHub) or `reviewers` (Azure DevOps) group |
 | `limits` | Description, body, catalog, instruction and `AGENTS.md` budgets |
 | `review_period_days` | When an active skill counts as stale |
+| `review` | `end` (the meta-skill runs every step) or `before-write` (it stops after identifying the skills, for a review) |
 | `sections` | Required and optional `SKILL.md` sections |
 | `catalog` | Overlap warning threshold; maximum dependency depth |
 | `forbidden_patterns`, `forbidden_patterns_context` | Regexes rejected in skills / in instructions and `AGENTS.md` |
-| `workspace` | Skills path, instructions path, manifest path |
-| `eval` | Model endpoint, judge endpoint, max tokens, trigger threshold |
+| `workspace` | `consumer` (the agent under test, as evals describe it), `output_folder`, `personal_skills_path`, and the deploy paths (skills, instructions, manifest) |
+| `eval` | Model endpoint, judge endpoint, max tokens, runs, trigger threshold, `repos_root`, `execution` (warehouse and SQL variables for the execution gate) |
 
 ## 10. Pipelines
 
@@ -251,5 +171,5 @@ pytest -q          # lint rules, freshness, build and checksums, deploy (mocked)
 
 The code is plain Python with `pyyaml`, `requests` and (optionally) `databricks-sdk`. `deploy` and `eval` import the SDK lazily, so linting and building need no Databricks access.
 
-To add a lint rule: add the check in `context-authoring/scripts/skillkit/lint.py` with a new code, document it in `docs/STANDARD.md` and the table above, and add a test in `tests/test_lint.py`.
+To add a lint rule: add the check in `context-authoring/scripts/skillkit/lint.py` with a new code, document it in `context-authoring/references/standard.md` (section 9), and add a test in `tests/test_lint.py`.
 

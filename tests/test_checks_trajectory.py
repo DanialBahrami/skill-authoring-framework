@@ -168,3 +168,27 @@ def test_checklist_lists_trajectory(repo: Path):
     _set_cases(repo, cases)
     text = checklist_markdown(load_skills(repo))
     assert "Did these in this order: `validate` → `deploy`" in text and "Did not: reads repository files" in text
+
+
+# The consumer works from the skill alone
+
+def test_pointing_at_the_source_warns(repo: Path):
+    _edit_md(repo, "2. Fill the description from the template.",
+             "2. Look at the other notebooks in the Silver folder and read the README for the conventions.")
+    findings = [f for f in lint.lint_skill(load_skill(repo / "skills" / "dp-prepare-pr"), load_standard(repo))
+                if f.code == "SK028"]
+    assert findings and all(f.severity == "warning" for f in findings)
+    assert "look at the other notebooks" in findings[0].message.lower()
+
+
+def test_writing_or_calling_repo_paths_does_not_warn(repo: Path):
+    _edit_md(repo, "2. Fill the description from the template.",
+             "2. Write the notebook to `Databricks/Silver/<system>/` and run `%run ../Common/silver_lib`; check the "
+             "result with `DESCRIBE TABLE`. Open the PR with the template below.\n\n   ```text\n   see the code\n   ```")
+    assert "SK028" not in _codes(repo, "warning")
+
+
+def test_reference_files_are_checked_too(repo: Path):
+    ref = repo / "skills" / "dp-prepare-pr" / "references" / "title-codes.md"
+    ref.write_text("# Title codes\n\nFor the full list, consult the wiki.\n")
+    assert "SK028" in _codes(repo, "warning")

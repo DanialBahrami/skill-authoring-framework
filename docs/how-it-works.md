@@ -2,79 +2,72 @@
 
 ## The parts
 
-![The meta-skill reads the repo and docs, goes through four stages with people deciding conflicts and scripts doing the checks, and produces a skill family. Operations are an optional later step.](img/how-it-works.svg)
+![The meta-skill reads the repo and docs and goes through five steps, with scripts doing the checks. It produces a skill family; people review the run's report. Operations are an optional later step.](img/how-it-works.svg)
 
-The **meta-skill** is the framework: a `SKILL.md` with the steps and reference files for the detail, which Genie Code follows. Two kinds of help come from outside it:
+The **meta-skill** is the framework: a short `SKILL.md` with five steps, and four reference files for the detail, which any agent that supports Agent Skills follows. Two kinds of help come from outside it:
 
-- **People** review what the meta-skill found and decide where sources disagree. The agent never guesses a side.
-- **Scripts** do the checks an agent can't do reliably on its own work: mechanical rules (lint), whether every name it mentions exists (check-names), and whether each skill actually improves answers, judged by a separate model with and without the skill (eval).
+- **Scripts** do what an agent can't do reliably on its own work: start a run from templates (`init`), and check it (`check`): mechanical rules (lint), whether every name exists in the code, and whether each skill improves answers, judged by a separate model with and without the skill.
+- **People** review the finished run in `report.md`: the decisions the meta-skill applied, the open conflicts, the proposals for other owners. The meta-skill never decides a contract break; it leaves it open and writes nothing that depends on it.
 
-**Operations** (`ops/`: CI, deployment, freshness) are about keeping skills current once a team relies on them. None of it is needed to create good skills.
+**Operations** (`ops/`: CI, deployment, freshness) keep skills current once a team relies on them. None of it is needed to create good skills.
 
-## The four stages
+## The five steps
 
-| Stage | What it does | Where quality comes from |
+| Step | What it does | Where quality comes from |
 | --- | --- | --- |
-| **Understand** (steps 1–3) | Lists every folder in scope and how closely it was read, then finds the tasks people repeat, with their steps, the helpers they use and the values that matter | Skills follow real tasks, not technology areas; every fact has a source; conventions come only from production code |
-| **Decide** (steps 4–5) | Puts each fact in one place (skill, `AGENTS.md`, workspace instructions, table comment, or nowhere) and lists conflicts between teams or between docs and code, with a suggested decision. Then stops | The same rule isn't repeated in ten skills; people settle disagreements |
-| **Write** (steps 6–7) | One skill per task, written to the writing rules; eval cases per skill; journeys for tasks that chain skills; proposals for other owners | Real names copied from the code, a default per decision, a guard at the risky step, templates per the assets rule |
-| **Check** (steps 8–9) | Lint, name check, evals with and without each skill, a checklist for a real Genie Code chat, a summary and a backlog | A skill that doesn't help is deleted |
+| **Start** | `init` creates the run folder and lists the skills, standing decisions and backlog that earlier runs left | Every run builds on what exists; no second skill for a task that has one |
+| **Analyze** | Lists what was read and how closely, then the tasks people repeat and the helpers, vocabularies and facts the consumer would need, each with a source and a layer | Skills follow real tasks; every fact has a source; conventions only from production code |
+| **Identify the skills** | Settles each conflict from evidence, or leaves it open; decides which tasks need a skill and plans the family (new, variant, update, unchanged) | People see every decision in one file; a skill changes only when an eval case fails today |
+| **Write** | One self-contained skill per task, written to the standard, with eval cases; journeys for skills that chain; proposals for other owners | Everything the task needs written in, real names copied from the code, a default per decision, a guard at the risky step |
+| **Check** | `check` runs lint, the name check, evals, the skill map and the agent checklist, and writes them into `report.md` | A skill that doesn't help is deleted |
+
+The meta-skill does not stop between steps. Teams that want to review the facts before any skill is written set `review: before-write` in `standard.yaml`; it then stops after identifying the skills.
 
 ## The files a run produces
 
-![Files by stage: coverage and inventory; classification and conflicts; skill map, skills with evals, journeys and three proposals; eval report, Genie Code checklist, summary and backlog.](img/run-files.svg)
+![Files by step: inventory.md (Analyze); decisions.md (Identify); skills with evals, journeys and proposals.md; report.md and eval.json.](img/run-files.svg)
 
-**The product** is the only part Genie Code uses when helping people.
+**The product** is the only part the consumer agent uses. Each skill is self-contained: the agent does its task from the skill without reading the source.
 
 | File | What's in it |
 | --- | --- |
-| `skills/<name>/` | `SKILL.md` (the steps), optional `references/` and `assets/`, `skill.yaml` (owner, sources, the skills it uses), `evals/evals.json` (eval cases). `skill.yaml` and `evals/` are never deployed. |
+| `skills/<name>/` | `SKILL.md`, optional `references/` and `assets/`, `skill.yaml` (owner, sources, the skills it uses) and `evals/evals.json`. `skill.yaml` and `evals/` are never deployed. |
 | `evals/journeys.json` | Eval cases for tasks that chain several skills |
 
-**Proposals.** The meta-skill doesn't apply these; it hands each to whoever owns that layer.
+**The run folder**, `authoring/runs/<date>-<scope>/`. The consumer agent never reads it. It lets people review the work, lets a new chat thread pick up where the last one stopped, and gives the next run its starting point.
 
-| File | For | Contents |
+| File | What's in it | Who reads it |
 | --- | --- | --- |
-| `agents-md-candidates.md` | Repo owners | Conventions every task in a folder needs; people write `AGENTS.md` from them |
-| `workspace-instructions.diff.md` | Platform team | Rules that must hold in every Genie Code response |
-| `uc-comments.sql` | Data owners | Table and column descriptions |
-
-**Working papers**, in `authoring/runs/<date>-<scope>/`. Genie Code never reads them when helping people. They let you review the work, let a new chat thread pick up where the last stopped, and give the next run a starting point.
-
-| File | What's in it | Why it matters |
-| --- | --- | --- |
-| `coverage.md` | Every folder: file count, kind (production, shared library, team-owned, tooling, ad hoc, archive), how closely it was read; every doc page read and whether it was useful | A partial run shows as partial; skills never copy from ad hoc scripts |
-| `inventory.md` | The facts: tasks with sub-steps, helpers, templates, values, guardrails, each with a source | Skills are written from this, not from memory |
-| `classification.md` | Where each fact goes | One place per fact |
-| `skill-map.md` | Every skill, what it uses and is used by, team variants, journeys and verdicts, as a table and a diagram. Planned at step 6 and shown before any skill is written; regenerated from the written skills at step 8 | The family's shape is reviewed before effort goes into writing it |
-| `conflicts.md` | Disagreements, a suggested decision, and the decision people made | The agent never guesses a side |
-| Eval report | Per skill: ADDS VALUE, NO EFFECT, FAILING or INCONCLUSIVE | Proof that each skill helps |
-| `genie-check.md` | Prompts to paste into a real Genie Code chat and what to look for | The one check the simulation can't do |
-| `summary.md` | What was made, results, open items, proposals for each owner | What the reviewer reads first |
-| `backlog.md` | Tasks found but not generated yet, and why | Where the next run starts |
-
-`inventory.md` and `conflicts.md` decide quality more than anything later, which is why the meta-skill stops after step 5 for review ([review checkpoint](../context-authoring/references/review-checkpoint.md)).
+| `inventory.md` | Coverage (every folder, how closely it was read, docs read), tasks, helpers and templates, vocabularies, facts, each with a source and a layer | The reviewer spot-checks it; skills are written from it |
+| `decisions.md` | Conflicts with the decision and its evidence, the planned skill family, what was not made a skill | The reviewer accepts or changes decisions; the next run keeps the reviewed ones |
+| `proposals.md` | `AGENTS.md` candidate lines, always-on instruction changes, catalog comments, forbidden patterns | Each owner applies their part |
+| `report.md` | What to review, what was made, the backlog, and the generated checks: lint, names, eval verdicts, skill map, agent checklist | The reviewer first; paste it into the pull request |
+| `eval.json` | Full eval results, including every answer | Whoever investigates a failing case |
 
 ### What they look like
 
 These examples are fictional.
 
-**`inventory.md`**, one task:
+**`inventory.md`**, one task and one fact:
 
-| Task | Sub-steps | Asked for on its own? | Source |
-| --- | --- | --- | --- |
-| Create a Silver table | copy the setup notebook → set the widgets → merge with `merge_table_silver` → tag PII columns | "tag PII": yes; the rest: no | `Setup/Silver/setup.py`, `lib/merge.py` |
+| Task (verb + object) | Who does it | Sub-steps, in order | Sub-steps asked for on their own | Sources |
+| --- | --- | --- | --- | --- |
+| Create a Silver table | Data engineers | copy the setup notebook → set the widgets → merge with `merge_table_silver` → tag PII columns | tag PII | `Setup/Silver/setup.py`, `lib/merge.py` |
 
-"Tag PII" is asked for on its own, so it becomes its own skill, which the Silver skill names at that step. The other steps stay inside the Silver skill.
+| Fact | Kind | Needed by | Layer | Source |
+| --- | --- | --- | --- | --- |
+| `merge_table_silver` replaced `merge_silver`; 14 of 16 notebooks use it | convention | Create a Silver table, Backfill a table | `agents-md:Databricks/` | `grep -rl merge_table_silver Databricks/` |
 
-**`conflicts.md`**, one row:
+"Tag PII" is asked for on its own, so it becomes its own skill, which the Silver skill names at that step.
 
-| Topic | Way A | Way B | Breaks a shared convention? | Suggested | Decision |
-| --- | --- | --- | --- | --- | --- |
-| Create a Silver table | Platform: `merge_table_silver` | Forecasting team: its own helper | No | Variant: both valid, chosen by team | Filled in by people |
+**`decisions.md`**, one conflict:
 
-## Create mode and update mode
+| # | Topic | Approach A (source) | Approach B (source) | Breaks the contract? | Decision | Why | Skills affected | Reviewed by |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Create a Silver table | Platform: `merge_table_silver` | Forecasting: its own helper | No | Variant | Same table contract; the team's helper is in all 14 of its notebooks | `dp-create-silver-table` | |
 
-**Create mode** gives a repo, team or domain its skills for the first time, or extends the set to new folders or teams. It runs all nine steps and starts from what earlier runs left: existing skills, the backlog, and decisions already made.
+## Create and update
 
-**Update mode** fixes one skill whose sources changed or that gave a wrong answer. It reads only what changed, edits the fewest lines that make the skill true again, adds a failing eval case first for a wrong answer, and re-runs the skill's evals and journeys. See [update-mode.md](../context-authoring/references/update-mode.md).
+Every run builds on the output folder. A run for a new scope (a repo, team, folder or set of docs) goes through all five steps and, for each task it finds, adds a skill, a variant in the skill that covers the task, or nothing. It changes an existing skill only with an eval case that fails today.
+
+A run about one skill (its sources changed, it gave a wrong answer, a reviewer changed a decision it depends on) follows [update.md](../context-authoring/references/update.md): it reads only what changed, adds a failing eval case first for a wrong answer, edits the fewest lines that make the skill true again, and checks the skill and its journeys.

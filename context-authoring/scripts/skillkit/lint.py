@@ -2,7 +2,7 @@
 
 Each finding has a code so reviewers and docs can refer to it:
 
-  SK001-SK027  one skill
+  SK001-SK028  one skill
   CT001-CT004  the catalog of skills
   WI001-WI003  workspace instructions
   AG001-AG002  AGENTS.md files
@@ -52,6 +52,13 @@ RETRY_ONLY_RE = re.compile(r"(?i)^\W*(just\s+)?(try( it)? again|retry( it)?|re-?
 TRAJECTORY_KEYS = {"order", "avoid"}
 STOPWORDS = {"the", "a", "an", "and", "or", "to", "of", "in", "for", "on", "with", "when", "use", "user", "asks",
              "is", "it", "this", "that", "by", "as", "from", "not", "skill", "be", "are", "any", "into"}
+
+# A skill that sends the consumer to the source makes it read code on every use, and guess from what it opened.
+POINTER_RE = re.compile(
+    r"(?i)\b(see|read|open|look (?:at|in|through)|refer to|consult|browse|study|follow|check)\s+(?:the\s+|how\s+)?"
+    r"(?:(?:existing|other|similar)\s+(?:notebooks?|jobs?|pipelines?|code|files?|examples?|scripts?)"
+    r"|code(?:base)?|repo(?:sitory)?|readme|implementation|wiki|source code|confluence)\b")
+FENCED_RE = re.compile(r"(?ms)^[ \t]*```.*?^[ \t]*```")   # fences inside numbered steps are indented
 
 # Agent Skills enterprise guidance: these patterns need a security reviewer's attention.
 SECURITY_PATTERNS = [
@@ -122,6 +129,21 @@ def lint_steps_and_recovery(skill: Skill, std: Standard) -> list[Finding]:
     for i, step in enumerate(_steps(_section(skill.body, "Steps")), start=1):
         if COMMAND_RE.search(step) and not CHECK_RE.search(step):
             _warn(out, "SK026", where, f"step {i} runs something but has no 'Check:' line saying how to confirm it worked")
+    return out
+
+
+def lint_pointers(skill: Skill) -> list[Finding]:
+    """SK028 (warning): a step or reference that sends the consumer to the code, the repo, a README or a
+    wiki instead of saying what it needs. Code blocks are not checked."""
+    out: list[Finding] = []
+    files = [("SKILL.md", skill.body)]
+    ref_dir = skill.path / "references"
+    if ref_dir.is_dir():
+        files += [(p.relative_to(skill.path).as_posix(), p.read_text(encoding="utf-8")) for p in sorted(ref_dir.rglob("*.md"))]
+    for rel, text in files:
+        for match in list(POINTER_RE.finditer(FENCED_RE.sub("", text)))[:2]:
+            _warn(out, "SK028", f"skills/{skill.name}/{rel}", f"points the consumer at the source ('{match.group(0)}'): "
+                  "write what it needs into the skill, so it does not read the code on every use")
     return out
 
 
@@ -216,6 +238,7 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
         if heading not in required and heading not in optional:
             _err(out, "SK009", where, f"section '## {heading}' is not allowed; use {', '.join(required + optional)}")
     out += lint_steps_and_recovery(skill, std)
+    out += lint_pointers(skill)
 
     # Links from SKILL.md resolve; reference files do not link further
     for target in _local_links(skill.body):
@@ -576,7 +599,7 @@ def lint_journeys(root, skills: list[Skill]) -> list[Finding]:
         out += lint_trajectory(j, where, "journey", "JR001")
         if not (j.get("must_include") or j.get("assertions") or j.get("trajectory")):
             _warn(out, "JR001", where, "no must_include or assertions: the journey can only fail on routing")
-        # Genie Code reaches a later skill only if an earlier one names it (listed in `uses`).
+        # The agent reaches a later skill only if an earlier one names it (listed in `uses`).
         if names and names[0] in status:
             reach, todo = set(), [names[0]]
             while todo:
@@ -587,6 +610,6 @@ def lint_journeys(root, skills: list[Skill]) -> list[Finding]:
                 todo += uses[cur]
             for name in names[1:]:
                 if name in status and name not in reach:
-                    _warn(out, "JR002", where, f"'{name}' is not reachable from '{names[0]}' through `uses`: Genie Code "
+                    _warn(out, "JR002", where, f"'{name}' is not reachable from '{names[0]}' through `uses`: the agent "
                           "would have to pick it on its own. Name it at the step that needs it, or drop it from the journey")
     return out
