@@ -1,6 +1,6 @@
 # Update mode: one skill, changed sources
 
-Also used from create mode (step 6) when a new scope adds facts to a skill that already exists: the trigger is then the new folders or pages, and the change is recorded as "updated" in `skill-map.md`.
+Also used from create mode (step 6) when a new scope shows that an existing skill fails: the trigger is then an eval case, written from the new folders or pages, that fails with the skill today. New facts alone are not a trigger. The change is recorded as "updated" in `skill-map.md`, and as "proposed" when another team owns the skill.
 
 Triggered by a freshness comment on a source-repo PR, a changed doc page, a failed eval, a review date, or a reported wrong answer.
 

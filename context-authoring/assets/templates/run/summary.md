@@ -19,7 +19,12 @@ Coverage: <complete / partial: which folders were not read closely; see coverage
 
 ## Skill map
 
-`skill-map.md` in the run folder: every skill, what it uses and is used by, journeys, verdicts.
+`skill-map.md` in the run folder: every skill, what it uses and is used by, journeys, verdicts, and what this run changed.
+
+## Proposed changes to other teams' skills
+
+| Skill | Owner | Change | Failing eval case it fixes |
+| --- | --- | --- | --- |
 
 ## Genie Code check
 
