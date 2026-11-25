@@ -4,8 +4,9 @@ import subprocess
 from pathlib import Path
 
 from skillkit import cli
-from skillkit.build import build
-from skillkit.freshness import affected_skills, glob_to_regex, mark_reviewed, stale_skills, write_confluence_versions
+from skillkit_ops import cli as ops_cli
+from skillkit_ops.build import build
+from skillkit_ops.freshness import affected_skills, glob_to_regex, mark_reviewed, stale_skills, write_confluence_versions
 from skillkit.model import load_skill, load_skills
 
 
@@ -73,14 +74,14 @@ def test_cli_new_and_lint(repo: Path, capsys):
 
 
 def test_cli_freshness_markdown(repo: Path, capsys):
-    cli.main(["--root", str(repo), "freshness", "--repo", "data-platform", "--changed",
+    ops_cli.main(["--root", str(repo), "freshness", "--repo", "data-platform", "--changed",
               "pull_request_template.md", "--format", "markdown"])
     out = capsys.readouterr().out
     assert "dp-prepare-pr" in out and "data-platform" in out
 
 
 def test_changed_skills(repo: Path):
-    from skillkit.freshness import changed_skills
+    from skillkit_ops.freshness import changed_skills
 
     def git(*args):
         subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
@@ -107,7 +108,7 @@ def test_deploy_plan_and_apply(repo: Path, tmp_path: Path, monkeypatch):
     import databricks.sdk
     from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-    from skillkit.build import deploy
+    from skillkit_ops.build import deploy
     from skillkit.model import load_standard
 
     calls = []
@@ -150,7 +151,7 @@ def test_deploy_plan_and_apply(repo: Path, tmp_path: Path, monkeypatch):
 
 
 def test_checksums_detect_changes(repo: Path, tmp_path: Path):
-    from skillkit.build import verify_build
+    from skillkit_ops.build import verify_build
 
     out = tmp_path / "out"
     build(repo, load_skills(repo), out)
@@ -160,8 +161,8 @@ def test_checksums_detect_changes(repo: Path, tmp_path: Path):
 
 
 def test_reviewers_formats(repo: Path, capsys):
-    cli.main(["--root", str(repo), "reviewers"])
+    ops_cli.main(["--root", str(repo), "reviewers"])
     out = capsys.readouterr().out
     assert "/skills/dp-*/  @my-org/data-platform" in out
-    cli.main(["--root", str(repo), "reviewers", "--format", "azure-devops"])
+    ops_cli.main(["--root", str(repo), "reviewers", "--format", "azure-devops"])
     assert "Data Platform Team" in capsys.readouterr().out

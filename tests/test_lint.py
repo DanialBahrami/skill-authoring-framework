@@ -120,12 +120,14 @@ def test_workspace_instructions_limits(repo: Path):
 
 
 def test_shipped_repo_lints_clean():
-    """The example skill, templates and workspace instructions in this repo pass lint."""
-    std = load_standard(REPO)
-    skills = load_skills(REPO)
+    """The example output folder, its skill and workspace instructions pass lint with the defaults."""
+    out = REPO / "examples" / "output"
+    std = load_standard(out)
+    skills = load_skills(out)
+    assert skills
     findings = [f for s in skills for f in lint.lint_skill(s, std)]
     findings += lint.lint_catalog(skills, std)
-    findings += lint.lint_workspace_instructions(REPO / "context" / "workspace-instructions.md", std)
+    findings += lint.lint_workspace_instructions(out / "context" / "workspace-instructions.md", std)
     findings += lint.lint_agents_md(REPO / "examples" / "data-platform" / "AGENTS.md", std)
     assert [str(f) for f in findings if f.severity == "error"] == []
 

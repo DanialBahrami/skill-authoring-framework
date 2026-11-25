@@ -44,7 +44,7 @@ from typing import Any, Protocol
 
 import yaml
 
-from .model import Skill, Standard, workspace_instructions_path
+from .model import Skill, Standard, defaults_dir, instructions_for_evals
 
 ROUTER_SYSTEM = """You select skills for Genie Code, the Databricks coding agent.
 You get a user request and the list of installed skills (name: description).
@@ -222,9 +222,9 @@ def _context_block(root: Path, case: dict[str, Any], repos_root: Path | None,
                    drafts_root: Path | None = None) -> tuple[str, list[str]]:
     warnings = []
     parts = []
-    wi = workspace_instructions_path(root)
-    if wi.is_file():
-        parts.append(f"# Workspace instructions\n{wi.read_text(encoding='utf-8')}")
+    text, _ = instructions_for_evals(root)
+    if text:
+        parts.append(f"# Workspace instructions\n{text}")
     for rel in case.get("agents", []) or []:
         draft = drafts_root / rel if drafts_root else None
         if draft is not None and draft.is_file():
@@ -284,6 +284,8 @@ def _mean(values: list[int | None]) -> int | None:
 
 def load_decoys(root: Path) -> list[dict[str, str]]:
     path = root / "evals" / "decoys.yaml"
+    if not path.is_file():
+        path = defaults_dir() / "decoys.yaml"    # the skill's default decoys
     if not path.is_file():
         return []
     return list((yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("decoys", []))
@@ -487,8 +489,8 @@ def run_context_evals(root: Path, std: Standard, cases_file: Path, llm: LLM, *, 
     model = std.eval.get("model_endpoint")
     judge_ep = std.eval.get("judge_endpoint", model)
     max_tokens = int(std.eval.get("max_tokens", 2000))
-    wi = workspace_instructions_path(root)
-    base = f"# Workspace instructions\n{wi.read_text(encoding='utf-8')}" if wi.is_file() else ""
+    text, _ = instructions_for_evals(root)
+    base = f"# Workspace instructions\n{text}" if text else ""
     results, warnings = [], []
     for raw in data.get("evals", []):
         case = dict(raw)

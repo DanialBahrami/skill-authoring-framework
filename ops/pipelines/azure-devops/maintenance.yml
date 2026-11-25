@@ -35,12 +35,12 @@ steps:
     displayName: Install skillkit
     workingDirectory: $(Pipeline.Workspace)/s/genie-context
 
-  - script: skillkit stale | tee $(Build.ArtifactStagingDirectory)/stale.txt
+  - script: skillkit-ops stale | tee $(Build.ArtifactStagingDirectory)/stale.txt
     displayName: Overdue reviews
     continueOnError: true
     workingDirectory: $(Pipeline.Workspace)/s/genie-context
 
-  - script: skillkit confluence-check | tee $(Build.ArtifactStagingDirectory)/confluence.txt
+  - script: skillkit-ops confluence-check | tee $(Build.ArtifactStagingDirectory)/confluence.txt
     displayName: Changed Confluence sources
     continueOnError: true
     workingDirectory: $(Pipeline.Workspace)/s/genie-context
@@ -71,7 +71,7 @@ steps:
 
   - script: |
       echo "One or more checks found work. See the maintenance artifact:"
-      echo "  stale.txt       -> owner re-checks the skill, runs 'skillkit reviewed <name>' or deprecates it"
+      echo "  stale.txt       -> owner re-checks the skill, runs 'skillkit-ops reviewed <name>' or deprecates it"
       echo "  confluence.txt  -> owner updates the skill (meta-skill update mode), then 'confluence-check <name> --write'"
       echo "  eval-report.md  -> owner reads the failing answer and fixes the skill or the case"
       exit 1

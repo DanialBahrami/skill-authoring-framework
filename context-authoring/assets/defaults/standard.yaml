@@ -1,0 +1,86 @@
+# Defaults for the meta-skill's scripts, used when the output folder has no standard.yaml.
+# To change a value, put a standard.yaml in the output folder with just the keys you change;
+# it is merged over these defaults. ops/standard.example.yaml shows a full team setup.
+
+version: 1
+
+platform_team: ""
+
+# Teams and skill-name prefixes. Empty: any prefix is allowed and owners are not checked.
+teams: {}
+
+prefixes: {}
+
+# Limits. The Agent Skills specification allows descriptions up to 1024 characters and
+# recommends bodies under 500 lines / 5000 tokens; ours are stricter because every
+# description is paid in every session of a shared workspace.
+limits:
+  description_min_chars: 80
+  description_max_chars: 600
+  name_max_chars: 64
+  body_max_lines: 200
+  body_max_tokens: 2500          # tokens estimated as characters / 4
+  catalog_max_tokens: 2500       # all active skill names + descriptions together
+  reference_toc_after_lines: 100 # longer reference files must start with a contents list
+  workspace_instructions_max_chars: 20000   # Databricks hard limit; text past it is ignored
+  workspace_instructions_max_tokens: 1500   # our own budget, paid on every response
+  agents_md_max_lines: 300
+
+review_period_days: 120
+
+# Section headings allowed in a SKILL.md body. Required ones must appear in this order.
+sections:
+  required: [Steps, Verify]
+  optional: [Gotchas, Rules, Examples, References]
+
+catalog:
+  # Skills installed in the workspace outside this context repo: "use" counts them in the budget,
+  # routing evals and overlap checks (with --installed); "ignore" leaves them out of runs entirely,
+  # for organisations that treat other skill sets as out of scope.
+  installed_skills: ignore
+  installed_folder: /Workspace/.assistant/skills
+  overlap_warning: 0.5       # description word overlap (Jaccard) that triggers a coexistence warning
+  max_dependency_depth: 2    # workflow -> block -> block at most
+
+# Patterns that must not appear in skills (SKILL.md, references/, assets/, scripts/).
+# Environment-specific values belong in workspace instructions or bundle variables.
+forbidden_patterns:
+  # Add your environment catalog names, e.g. regex: '\bmycatalog_(dev|stg|prd)\b'
+  - name: workspace host                    # AWS, Azure and GCP workspace URLs
+    regex: '[\w.-]+\.(cloud\.databricks\.com|azuredatabricks\.net|gcp\.databricks\.com)'
+  - name: email address
+    regex: '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,}'
+  - name: GUID (pool, warehouse, service principal or tenant id)
+    regex: '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+  - name: secret-looking token
+    regex: '\bdapi[0-9a-f]{32}\b'
+  - name: dated or versioned note
+    regex: '(?i)\b(since|as of|from|until)\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+20\d\d\b|\bas of 20\d\d\b'
+
+# Patterns that must not appear in AGENTS.md files or workspace instructions.
+# Catalog names are allowed there; credentials and personal data are not.
+forbidden_patterns_context:
+  - name: email address
+    regex: '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,}'
+  - name: secret-looking token
+    regex: '\bdapi[0-9a-f]{32}\b'
+
+workspace:
+  skills_path: /Workspace/.assistant/skills
+  instructions_path: /Workspace/.assistant_workspace_instructions.md
+  manifest_path: /Workspace/.assistant/genie-context-manifest.json   # deployed commit + checksums
+
+eval:
+  model_endpoint: databricks-claude-sonnet-4-5
+  # Use a judge from a different model family than the model under test;
+  # a same-model judge tends to be lenient.
+  judge_endpoint: databricks-gpt-oss-120b
+  max_tokens: 2000
+  trigger_threshold: 0.5     # routing passes when the trigger rate over --runs reaches this
+  # Execution gate (skillkit eval --execute): SQL in answers is planned with EXPLAIN on a development
+  # SQL warehouse. Run it as an identity that can only read the development catalog.
+  # execution:
+  #   warehouse_id: ""         # or --warehouse-id / DATABRICKS_WAREHOUSE_ID
+  #   variables:               # values for ${name}, {{name}}, {name} and :name in generated SQL
+  #     catalog: my_dev_catalog
+  #   catalogs: [my_dev_catalog]   # tables in these catalogs get DESCRIBE TABLE (default: the variable values)

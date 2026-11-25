@@ -55,7 +55,7 @@ jobs:
       - name: Find changed skills (and skills that use them)
         id: changed
         working-directory: genie-context
-        run: echo "skills=$(skillkit changed --base origin/${{ github.base_ref }})" >> "$GITHUB_OUTPUT"
+        run: echo "skills=$(skillkit-ops changed --base origin/${{ github.base_ref }})" >> "$GITHUB_OUTPUT"
 
       - name: Evals with baseline (changed skills, 3 runs) and routing for all skills
         if: steps.changed.outputs.skills != ''

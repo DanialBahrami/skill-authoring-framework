@@ -109,7 +109,7 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
     if len(skill.name) > std.limit("name_max_chars"):
         _err(out, "SK003", where, f"name is longer than {std.limit('name_max_chars')} characters")
     team = std.team_for_prefix(skill.name)
-    if team is None:
+    if team is None and std.prefixes:   # no prefixes configured: any prefix is fine
         _err(out, "SK004", where, f"prefix '{skill.name.split('-', 1)[0]}' is not registered in standard.yaml")
 
     desc = skill.description
@@ -224,7 +224,7 @@ def lint_skill(skill: Skill, std: Standard) -> list[Finding]:
             ref = var.get("reference", "")
             if not (skill.path / ref).is_file():
                 _err(out, "SK016", where, f"variants[{i}] reference '{ref}' does not exist")
-            if var.get("owner") not in std.teams:
+            if std.teams and var.get("owner") not in std.teams:
                 _err(out, "SK016", where, f"variants[{i}] owner '{var.get('owner')}' is not a team in standard.yaml")
             if ref and ref not in _local_links(skill.body):
                 _err(out, "SK016", where, f"variant reference '{ref}' must be linked from SKILL.md with the condition that selects it")

@@ -11,7 +11,7 @@
 #   steps:
 #     - checkout: self
 #       fetchDepth: 0
-#     - template: pipelines/azure-devops/templates/source-repo-freshness.yml@genie_context
+#     - template: ops/pipelines/azure-devops/templates/source-repo-freshness.yml@genie_context
 #       parameters:
 #         repoName: data-platform
 #
@@ -32,7 +32,7 @@ steps:
       cd "$(Build.Repository.LocalPath)"
       git diff --name-only "origin/$(System.PullRequest.TargetBranchName)...HEAD" > "$(Agent.TempDirectory)/changed.txt"
       cd "$(Pipeline.Workspace)/s/genie-context"
-      skillkit freshness --repo "${{ parameters.repoName }}" \
+      skillkit-ops freshness --repo "${{ parameters.repoName }}" \
         --changed-file "$(Agent.TempDirectory)/changed.txt" --format markdown > "$(Agent.TempDirectory)/freshness.md"
       cat "$(Agent.TempDirectory)/freshness.md"
     displayName: Find affected Genie Code skills
