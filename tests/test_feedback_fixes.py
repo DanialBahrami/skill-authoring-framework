@@ -264,6 +264,22 @@ def test_check_names_skips_flags_urls_and_assignments_but_checks_calls(repo: Pat
         assert skipped not in report, skipped
 
 
+def test_path_spans_match_whole_segments(tmp_path: Path):
+    from skillkit.names import _found, index_repo
+
+    src = tmp_path / "source"
+    (src / "Databricks" / "lib").mkdir(parents=True)
+    (src / "Databricks" / "lib" / "merge.py").write_text("def merge_table_silver(): ...\n")
+    (src / "Setup" / "Silver").mkdir(parents=True)
+    (src / "Setup" / "Silver" / "setup.py").write_text("# notebook\n")
+    (src / "README.md").write_text("Run %run ../Common/helpers first.\n")
+    idx = [index_repo(src)]
+    for ok in ("lib/merge.py", "Databricks/lib/merge.py", "Setup/Silver/setup", "Common/helpers"):
+        assert _found(ok, idx), ok
+    for bad in ("ib/merge.py", "other/merge.py", "Silver/setu", "mmon/helpers"):
+        assert not _found(bad, idx), bad
+
+
 def test_journey_without_skills_is_reported(repo: Path):
     from skillkit.evals import load_journeys, run_journeys
 

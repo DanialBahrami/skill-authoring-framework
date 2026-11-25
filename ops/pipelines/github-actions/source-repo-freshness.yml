@@ -34,7 +34,7 @@ jobs:
       - name: Find affected skills
         run: |
           git -C source diff --name-only "origin/${{ github.base_ref }}...HEAD" > changed.txt
-          skillkit --root genie-context freshness --repo "$REPO_NAME" --changed-file changed.txt --format markdown > freshness.md
+          skillkit-ops --root genie-context freshness --repo "$REPO_NAME" --changed-file changed.txt --format markdown > freshness.md
           cat freshness.md
       - name: Comment on the PR
         env:
