@@ -1,5 +1,5 @@
-# Tunable parts of the Genie Code context standard (docs/STANDARD.md).
-# skillkit reads this file; change limits here, not in code.
+# A full team setup for a context repo (see ops/operating.md). Copy to the repo root as standard.yaml;
+# it is merged over the meta-skill defaults (context-authoring/assets/defaults/standard.yaml).
 # The team who owns the context repo (the "platform team") approves changes to this file.
 
 version: 1
@@ -8,7 +8,7 @@ platform_team: data-platform   # owns the context repo, workspace instructions a
 
 # EXAMPLE VALUES: replace teams, prefixes and reviewer groups with your own.
 # `codeowners` is the GitHub team for CODEOWNERS; `reviewers` the Azure DevOps group
-# for branch policies. `skillkit reviewers` prints either.
+# for branch policies. `skillkit-ops reviewers` prints either.
 teams:
   data-platform:
     name: Data Platform
