@@ -65,10 +65,10 @@ def cmd_catalog(args) -> int:
     skills = load_skills(root)
     if args.map:
         from .evals import load_journeys
-        from .skillmap import load_verdicts, map_markdown
+        from .skillmap import load_verdicts, map_markdown, planned_changes
 
         md = map_markdown(skills, load_journeys(root), load_verdicts(Path(args.eval_json) if args.eval_json else None),
-                          args.scope or "")
+                          args.scope or "", planned_changes(Path(args.out) if args.out else None))
         if args.out:
             Path(args.out).write_text(md, encoding="utf-8")
             print(f"wrote {args.out}")

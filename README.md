@@ -87,8 +87,23 @@ Before writing any skill, Genie shows the planned family in `skill-map.md`: a ta
 The second run is cheaper than the first:
 
 - **Update mode** reads only what changed and edits the fewest lines that make the skill true again, so human fixes elsewhere survive. A wrong answer is first added as a failing eval case, then fixed. The journeys that include the skill are checked too.
-- **A new create run** starts from what exists: current skills, the last run's backlog, and conflict decisions already made, which it doesn't ask about again. If another team does a task differently, its way becomes a variant inside the existing skill, not a second skill.
+- **A new create run** starts from what exists: current skills, the last run's backlog, and conflict decisions already made, which it doesn't ask about again. For each task it finds, it decides: a new skill; an update to the existing skill when the new folders add facts (made the update-mode way, keeping earlier edits); or a variant inside the existing skill when another team does the task differently. Never a second skill for a task that has one. `skill-map.md` marks every skill as new, updated, variant added or unchanged.
 - **Evals** cache their results, so only cases whose skill or question changed run again.
+
+### Other teams
+
+Any team, the platform team included, can use the meta-skill for its own folders. Each new skill then meets the same bar:
+
+- **Standard:** lint enforces the format, sizes, required sections, naming, and no hardcoded environment values.
+- **Checked:** names are checked against the repo, and evals with and without the skill prove it helps. The execution gate checks generated SQL, journeys check skills that chain, and a person tries it in Genie Code.
+- **Not redundant:** before writing, the meta-skill loads the existing skills and extends them (update or variant) instead of duplicating them. Lint warns when two descriptions overlap, and the review checkpoint asks about duplicates.
+- **Not unnecessary:** a skill exists only for a task people ask for on its own. Shared rules go to `AGENTS.md`, and a skill with no measurable effect (NO EFFECT) is deleted.
+
+The redundancy check only covers skills the run can see, so teams must share one skill family:
+
+- **One shared output folder** for everyone, for example a Git folder or a context repo (see [Running it at scale](#9-running-it-at-scale)), not each person's own `genie-skills/`. Pass it as "Output folder: <path>".
+- **A prefix per team** in that folder's `standard.yaml` (`prefixes: {dp: data-platform, em: energy-management}`), so every skill has an owner and conflicts with platform conventions go to the platform team.
+- **`catalog.installed_skills: use`** once the workspace has skills from elsewhere, so runs also compare against what's installed.
 
 ## 5. What you get
 

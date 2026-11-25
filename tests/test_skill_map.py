@@ -46,3 +46,21 @@ def test_map_notes_skills_that_use_others_without_a_journey(repo: Path, capsys):
         {"id": "pr-only", "prompt": "p", "skills": ["dp-prepare-pr", "dp-review-notebook"], "must_include": ["x"]}]}))
     assert main(["--root", str(repo), "catalog", "--map"]) == 0
     assert "appear in no journey: `dp-onboard-new-source`" in capsys.readouterr().out
+
+
+def test_generated_map_keeps_this_run_from_the_planned_map(repo: Path, tmp_path: Path):
+    _family(repo)
+    out = tmp_path / "skill-map.md"
+    out.write_text("# Skill map: gold (planned)\n\n"
+                   "| Skill | Task (from inventory.md) | Owner | Uses | Used by | Team variants | This run |\n"
+                   "| --- | --- | --- | --- | --- | --- | --- |\n"
+                   "| `<prefix>-<verb>-<object>` | <task> | <team> | | | | new |\n"
+                   "| `dp-onboard-new-source` | Onboard a source | data-platform | | | | new |\n"
+                   "| `dp-prepare-pr` | Prepare a PR | data-platform | | | | updated: gold release step |\n")
+    assert main(["--root", str(repo), "catalog", "--map", "--out", str(out)]) == 0
+    md = out.read_text()
+    rows = {line.split("|")[1].strip(): line for line in md.splitlines() if line.startswith("| `")}
+    assert rows["`dp-onboard-new-source`"].endswith("| new |")
+    assert rows["`dp-prepare-pr`"].endswith("| updated: gold release step |")
+    assert rows["`dp-review-notebook`"].endswith("| unchanged |")
+    assert "This run |" in md and "<prefix>" not in md
