@@ -17,6 +17,10 @@ Coverage: <complete / partial: which folders were not read closely; see coverage
 | Workspace instruction changes | workspace-instructions.diff.md | Platform team |
 | Unity Catalog comments | uc-comments.sql | Data owners |
 
+## Skill map
+
+`skill-map.md` in the run folder: every skill, what it uses and is used by, journeys, verdicts.
+
 ## Genie Code check
 
 `genie-check.md` in the run folder. Checked: <skills> · Not yet checked: <skills>
